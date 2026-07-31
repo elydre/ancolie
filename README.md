@@ -1,6 +1,21 @@
 # cream & ancolie
 
-custom instruction set, esoteric programming language (`ancolie`), single pass compiler (`llc`), and emulator
+custom instruction set, esoteric programming language (`ancolie`), single pass compiler (`llc`), emulator and operating system (`frostOS`).
+
+## how to use ?
+
+```sh
+# compile a ancolie program
+python llc.py -o program.bin program.li
+
+# emulator without GUI support
+gcc -o emulator emulator.c
+./emulator program.bin
+
+# emulator with GUI support
+gcc -DGUI -o emulator emulator.c -lSDL2 -lSDL2_ttf
+./emulator --gui program.bin
+```
 
 ## Todo
 
@@ -37,21 +52,6 @@ custom instruction set, esoteric programming language (`ancolie`), single pass c
 - [x] add screen to the emulator
 - [ ] langage documentation
 - [ ] create a basic operating system
-
-## how to use ?
-
-```sh
-# compile a ancolie program
-python llc.py -o program.bin program.li
-
-# emulator without GUI support
-gcc -o emulator emulator.c
-./emulator program.bin
-
-# emulator with GUI support
-gcc -DGUI -o emulator emulator.c -lSDL2 -lSDL2_ttf
-./emulator --gui program.bin
-```
 
 ## ancolie language
 
