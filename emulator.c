@@ -64,7 +64,7 @@ void render_screen(void) {
             char str[2] = {c, '\0'};
 
             SDL_Color color = {255, 255, 255, 255};
-            SDL_Surface *surface = TTF_RenderText_Solid(font, str, color);
+            SDL_Surface *surface = TTF_RenderText_Blended(font, str, color);
             SDL_Texture *texture = SDL_CreateTextureFromSurface(renderer, surface);
 
             SDL_Rect dstrect = {x * font_width, y * font_height, font_width, font_height};
@@ -107,6 +107,7 @@ void init_gui(void) {
         SDL_Quit();
         exit(1);
     }
+    TTF_SetFontHinting(font, TTF_HINTING_LIGHT);
 
     if (TTF_SizeText(font, "M", &font_width, NULL) != 0) {
         fprintf(stderr, "TTF_SizeText Error: %s\n", TTF_GetError());
@@ -237,8 +238,11 @@ void gui_loop(uint64_t ips, uint64_t delta_time) {
     }
 
     SDL_Color color = {255, 255, 255, 255}; // white color
-    SDL_Surface *surface = TTF_RenderText_Solid(font, str, color);
-    info_texture = SDL_CreateTextureFromSurface(renderer, surface);
+    SDL_Surface *surface = TTF_RenderText_Blended(font, str, color);
+    SDL_Texture *new_info_texture = SDL_CreateTextureFromSurface(renderer, surface);
+    SDL_FreeSurface(surface);
+    SDL_DestroyTexture(info_texture);
+    info_texture = new_info_texture;
 
     update_gui();
 }
