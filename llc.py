@@ -12,7 +12,10 @@ parser = argparse.ArgumentParser(description="Cream Compiler")
 parser.add_argument("input_file", help="Input file to compile", type=str)
 parser.add_argument("-o", "--output", help="Output file name", default="output.bin", dest="output_file")
 parser.add_argument("-a", "--dump-asm", help="Dump assembly code to stdout", action="store_true", dest="dump_asm")
+parser.add_argument("-x", "--extra-errors", help="Add boring code checks", action="store_true", dest="extra_err")
 args = parser.parse_args()
+
+defs.EXTRAERR = args.extra_err
 
 try:
     with open(args.input_file, "r") as ifile:

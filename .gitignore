@@ -1,3 +1,5 @@
+/compiler/__pycache__
+emulator
+
 *.bin
 *.out
-/compiler/__pycache__

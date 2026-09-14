@@ -152,6 +152,8 @@ STATIC_BYTES    = bytearray()
 CURRENT_LNO = 0
 CURRENT_SCOPE = "global"
 
+EXTRAERR = False
+
 LOCAL_VARS = {}
 STATIC_VARS = {}
 

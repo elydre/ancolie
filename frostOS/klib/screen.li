@@ -1,7 +1,42 @@
+func screen_flush() {
+    out(0x1021, screen_y 80 * screen_x +)
+    out(0x1020, 0)
+}
+
 func screen_clear() {
     memset(screen, ' ', 80 25 *)
     screen_x = 0
     screen_y = 0
+}
+
+func putchar(c) {
+    if c '\n' == {
+        screen_x = 0
+        screen_y = screen_y 1 +
+        return
+    }
+    if c '\r' == {
+        screen_x = 0
+        return
+    }
+    if c '\b' == {
+        if screen_x 0 > {
+            screen_x = screen_x 1 -
+        }
+        [screen 80 screen_y * + screen_x +] = ' '
+        return
+    }
+    if screen_x 79 > {
+        screen_x = 0
+        screen_y = screen_y 1 +
+    }
+    if screen_y 24 > {
+        memmov(screen, screen 80 +, 80 24 *)
+        memset(screen 80 24 * +, ' ', 80)
+        screen_y = 24
+    }
+    [screen 80 screen_y * + screen_x +] = c
+    screen_x = screen_x 1 +
 }
 
 func print(str) {
@@ -12,45 +47,10 @@ func print(str) {
         if c 0 == {
             break
         }
-        if c '\n' == {
-            screen_x = 0
-            screen_y = screen_y 1 +
-            continue
-        }
-        if c '\r' == {
-            screen_x = 0
-            continue
-        }
-        if c '\b' == {
-            if screen_x 0 > {
-                screen_x = screen_x 1 -
-            }
-            [screen 80 screen_y * + screen_x +] = ' '
-            continue
-        }
-        if screen_x 79 > {
-            screen_x = 0
-            screen_y = screen_y 1 +
-        }
-        if screen_y 24 > {
-            memmov(screen, screen 80 +, 80 24 *)
-            memset(screen 80 24 * +, ' ', 80)
-            screen_y = 24
-        }
-        [screen 80 screen_y * + screen_x +] = c 
-        screen_x = screen_x 1 +
+        putchar(c)
     }
 
-    out(0x1021, screen_y 80 * screen_x +)
-    out(0x1020, 0)
-}
-
-func putchar(c) {
-    : str
-    str = alloca(2)
-    [str] = c
-    [str 1 +] = 0
-    print(str)
+    screen_flush()
 }
 
 func putnbr(n) {

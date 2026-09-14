@@ -13,6 +13,7 @@ def tokenize_line(line: str):
     lines = []
 
     in_string = False
+    string_token = None
     current_token = ""
 
     skip_to = 0
@@ -21,11 +22,13 @@ def tokenize_line(line: str):
         if i < skip_to:
             continue
 
-        if char == '"':
+        if (in_string and char == string_token) or ((not in_string) and (char in ["'", '"'])):
             current_token += char
             if in_string:
                 tokens.append(current_token)
                 current_token = ""
+            else:
+                string_token = char
             in_string = not in_string
             continue
 

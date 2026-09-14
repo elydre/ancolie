@@ -16,6 +16,12 @@ def say_error(message):
     print(f"Error line {defs.CURRENT_LNO}: {message}")
     exit(1)
 
+def say_extra_error(message):
+    if not defs.EXTRAERR:
+        return
+    print(f"Extra Error line {defs.CURRENT_LNO}: {message}")
+    exit(1)
+
 CURRENT_LABEL = 0
 
 def get_new_label():

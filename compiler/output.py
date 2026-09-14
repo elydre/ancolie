@@ -51,10 +51,10 @@ class output_file:
             debut += section.size
 
         for section in self.sections:
+            header += section.type.to_bytes(2, byteorder='little')
             header += section.debut.to_bytes(2, byteorder='little')
             header += section.size.to_bytes(2, byteorder='little')
             header += section.dest_addr.to_bytes(2, byteorder='little')
-            header += section.type.to_bytes(2, byteorder='little')
 
         file.write(header)
 

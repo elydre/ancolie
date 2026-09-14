@@ -1,16 +1,35 @@
-:to_test div is_prime
+:n
 
-to_test = 1
+func is_prime(n) {
+    :i
 
-for to_test (0, 100) {
-    is_prime = 1
-    for div (2, to_test) {
-        if to_test div % 0 == {
-            is_prime = 0
-            break
+    if n 3 % 0 == {
+        return
+    }
+
+    i = 5
+    while i i * n 1 + < {
+        if n i % 0 == {
+            return
         }
+        if n i 2 + % 0 == {
+            return
+        }
+        i = i 6 +
     }
-    if is_prime 1 == {
-        dump(to_test)
-    }
+
+    dump(n)
+}
+
+dump(2)
+dump(3)
+
+n = 5
+
+while n 65000 < {
+    is_prime(n)
+    n = n 2 +
+
+    is_prime(n)
+    n = n 4 +
 }

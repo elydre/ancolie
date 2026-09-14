@@ -36,6 +36,10 @@ def calculate_rpn(rpn: list):
     if not rpn:
         utl.say_error("Empty RPN expression")
 
+    if len(rpn) > 2 and rpn[0] == '(' and rpn[-1] == ')':
+        utl.say_extra_error("Unnecessary parentheses in RPN expression")
+        rpn = rpn[1:-1]
+
     stack_size = 0
     have_ampersand = False
 

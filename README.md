@@ -192,24 +192,27 @@ magic number         (16 bit)
 ARCH version         (16 bit)
 section count        (16 bit)
 
+section 0 type       (16 bit)
 section 0 debut      (16 bit)
 section 0 size       (16 bit)
 section 0 dest-addr  (16 bit)
-section 0 type       (16 bit)
 
+section 1 type       (16 bit)
 section 1 debut      (16 bit)
 section 1 size       (16 bit)
 section 1 dest-addr  (16 bit)
-section 1 type       (16 bit)
 ...
 
-[DATA]
-section 0 data   (section 0 size * 16 bit)
-section 1 data   (section 1 size * 16 bit)
+[SECTION 0 DATA]
+...
+
+[SECTION 1 DATA]
 ...
 ```
 
-`section debut` is the offset in the file where the section data starts
+- `magic number` is used to identify the file format, it should be `0xF057`
+- `debut` and `size` are in bytes (8 bits), `dest-addr` is in words (16 bit)
+- `section debut` is the offset in the file where the section data starts
 
 section type:
 - 0: code (in X memory)

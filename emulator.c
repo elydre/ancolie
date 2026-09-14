@@ -7,10 +7,11 @@
 
 #ifdef GUI
 #include <SDL2/SDL.h>
-#include <SDL2/SDL_ttf.h>
+#include <fcntl.h>
 #endif
 
 #define MEMORY_SIZE 65536
+#define SCREEN_MEMORY 63536
 
 #undef min
 #define min(a, b) ((a) < (b) ? (a) : (b))
@@ -28,165 +29,224 @@ int use_gui;
 
 #ifdef GUI
 
-#define FPS_TARGET 10
+#define FPS_TARGET 30
 #define SCREEN_X 80
 #define SCREEN_Y 25
-
-SDL_Window *window;
-SDL_Renderer *renderer;
-TTF_Font *font;
-SDL_Texture *screen_texture;
-SDL_Texture *info_texture;
-
-int font_width, font_height;
-int cursor_pos = 0;
 
 typedef struct {
     uint16_t type;
     uint16_t value;
 } keyboard_event_t;
 
-keyboard_event_t keyboard_buffer[256];
-int keyboard_buffer_size = 0;
+typedef struct {
+    uint32_t width;
+    uint32_t height;
+    uint32_t charcount;
+    uint32_t charsize;
 
-void render_screen(void) {
-    SDL_Texture *previous_target = SDL_GetRenderTarget(renderer);
-    SDL_SetRenderTarget(renderer, screen_texture);
+    uint8_t *data;
+} font_data_t;
 
-    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
-    SDL_RenderClear(renderer);
+typedef struct {
+    SDL_Window *window;
+    SDL_Renderer *renderer;
+    SDL_Texture *texture;
+
+    font_data_t *font;
+    int cursor_pos;
+
+    keyboard_event_t kbbuf[256];
+    int kbbuf_size;
+
+    uint32_t *fb;
+    int pitch;
+} gui_context_t;
+
+gui_context_t gui;
+
+static inline void print_char(uint32_t xo, uint32_t yo, char c, uint32_t fg) {
+    if (c == 0) c = ' ';
+
+    uint8_t *char_data = gui.font->data + (c * gui.font->charsize);
+
+    uint32_t x = 0;
+    uint32_t y = 0;
+
+    for (uint32_t i = 0; i < gui.font->charsize; i++) {
+        for (int j = 7; j >= 0; j--) {
+            gui.fb[(xo + x) + (yo + y) * (gui.pitch / 4)] = char_data[i] & (1 << j) ? fg : 0;
+            if (x == gui.font->width - 1) {
+                x = 0;
+                y++;
+                break;
+            }
+            x++;
+        }
+    }
+}
+
+void rwmem_to_screen(void) {
+    static char last_screen[SCREEN_X * SCREEN_Y];
+    static int last_cursor_pos = -1;
+
+    int cursor_x, cursor_y;
+
+    if (last_cursor_pos != gui.cursor_pos) {
+        if (last_cursor_pos >= 0 && last_cursor_pos < SCREEN_X * SCREEN_Y) {
+            cursor_x = last_cursor_pos % SCREEN_X;
+            cursor_y = last_cursor_pos / SCREEN_X;
+            print_char(cursor_x * gui.font->width, cursor_y * gui.font->height,
+                    rwmem[SCREEN_MEMORY + cursor_y * SCREEN_X + cursor_x] & 0xFF, 0xFFFFFFFF);
+        }
+        last_cursor_pos = gui.cursor_pos;
+    }
 
     for (int y = 0; y < SCREEN_Y; y++) {
         for (int x = 0; x < SCREEN_X; x++) {
-            uint16_t addr = (MEMORY_SIZE - (SCREEN_X * SCREEN_Y)) + (y * SCREEN_X) + x;
-
-            char c = (char)(rwmem[addr] & 0xFF);
-            char str[2] = {c, '\0'};
-
-            SDL_Color color = {255, 255, 255, 255};
-            SDL_Surface *surface = TTF_RenderText_Blended(font, str, color);
-            SDL_Texture *texture = SDL_CreateTextureFromSurface(renderer, surface);
-
-            SDL_Rect dstrect = {x * font_width, y * font_height, font_width, font_height};
-            SDL_RenderCopy(renderer, texture, NULL, &dstrect);
-
-            SDL_FreeSurface(surface);
-            SDL_DestroyTexture(texture);
+            char c = rwmem[SCREEN_MEMORY + y * SCREEN_X + x] & 0xFF;
+            if (last_screen[y * SCREEN_X + x] != c) {
+                print_char(x * gui.font->width, y * gui.font->height, c, 0xFFFFFFFF);
+                last_screen[y * SCREEN_X + x] = c;
+            }
         }
     }
 
-    // Render the cursor
-    int cursor_x = cursor_pos % SCREEN_X;
-    int cursor_y = cursor_pos / SCREEN_X;
+    // print_char((gui.cursor_pos % SCREEN_X) * gui.font->width,
+    //         (gui.cursor_pos / SCREEN_X) * gui.font->height, '_', 0xAAAAAAAA);
+    cursor_x = gui.cursor_pos % SCREEN_X;
+    cursor_y = gui.cursor_pos / SCREEN_X;
 
-    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-    SDL_Rect cursor_rect = {cursor_x * font_width, cursor_y * font_height, font_width, font_height};
-    SDL_RenderDrawRect(renderer, &cursor_rect);
+    for (int y = 0; y < gui.font->height; y++) {
+        for (int x = 1; x < 3; x++) {
+            gui.fb[(cursor_x * gui.font->width + x) + (cursor_y * gui.font->height + y) * (gui.pitch / 4)] ^= 0xAAAAAAAA;
+        }
+    }
 
-    SDL_SetRenderTarget(renderer, previous_target);
+}
+
+font_data_t *load_psf_font(const char *path) {
+    int fd = open(path, O_RDONLY);
+    if (fd < 0) {
+        perror("Failed to open font file");
+        return NULL;
+    }
+
+    uint32_t magic;
+    uint32_t version;
+    uint32_t headersize;
+    uint32_t charcount;
+    uint32_t charsize;
+    uint32_t height;
+    uint32_t width;
+
+    if (pread(fd, &magic, 4, 0)      != 4 ||
+        pread(fd, &version, 4, 4)    != 4 ||
+        pread(fd, &headersize, 4, 8) != 4 ||
+        pread(fd, &charcount, 4, 16) != 4 ||
+        pread(fd, &charsize, 4, 20)  != 4 ||
+        pread(fd, &height, 4, 24)    != 4 ||
+        pread(fd, &width, 4, 28)     != 4
+    ) {
+        perror("Failed to read font header");
+        close(fd);
+        return NULL;
+    }
+
+    if (magic != 0x864ab572 || version != 0)
+        return NULL;
+    
+    size_t size = charcount * charsize;
+    uint8_t *font = malloc(size);
+
+    if (pread(fd, font, size, headersize) != size) {
+        perror("Failed to read font data");
+        free(font);
+        close(fd);
+        return NULL;
+    }
+
+    close(fd);
+
+    font_data_t *psf = malloc(sizeof(font_data_t));
+    psf->width = width;
+    psf->height = height;
+    psf->charcount = charcount;
+    psf->charsize = charsize;
+    psf->data = font;
+
+    return psf;
+}
+
+void cleanup_gui(void) {
+    if (gui.font) {
+        free(gui.font->data);
+        free(gui.font);
+    }
+    if (gui.texture)
+        SDL_DestroyTexture(gui.texture);
+    if (gui.renderer)
+        SDL_DestroyRenderer(gui.renderer);
+    if (gui.window)
+        SDL_DestroyWindow(gui.window);
+
+    SDL_Quit();
 }
 
 void init_gui(void) {
+    memset(&gui, 0, sizeof(gui_context_t));
+
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
         fprintf(stderr, "SDL_Init Error: %s\n", SDL_GetError());
         exit(1);
     }
 
-    // Initialize SDL_ttf
-    if (TTF_Init() == -1) {
-        fprintf(stderr, "TTF_Init Error: %s\n", TTF_GetError());
-        SDL_Quit();
+    gui.font = load_psf_font("asset/zap-light20.psf");
+
+    if (gui.font == NULL) {
+        fprintf(stderr, "Failed to load font\n");
+        cleanup_gui();
         exit(1);
     }
 
-    // load a font (using system font for simplicity)
-    font = TTF_OpenFont("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", 16);
-    if (font == NULL) {
-        fprintf(stderr, "TTF_OpenFont Error: %s\n", TTF_GetError());
-        TTF_Quit();
-        SDL_Quit();
-        exit(1);
-    }
-    TTF_SetFontHinting(font, TTF_HINTING_LIGHT);
-
-    if (TTF_SizeText(font, "M", &font_width, NULL) != 0) {
-        fprintf(stderr, "TTF_SizeText Error: %s\n", TTF_GetError());
-        TTF_CloseFont(font);
-        TTF_Quit();
-        SDL_Quit();
-        exit(1);
-    }
-    font_height = TTF_FontHeight(font);
-
-    window = SDL_CreateWindow("Emulator", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, SCREEN_X * font_width, (SCREEN_Y + 1) * font_height, SDL_WINDOW_SHOWN);
-    if (window == NULL) {
+    gui.window = SDL_CreateWindow("Emulator", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, SCREEN_X * gui.font->width, (SCREEN_Y + 1) * gui.font->height, SDL_WINDOW_SHOWN);
+    if (gui.window == NULL) {
         fprintf(stderr, "SDL_CreateWindow Error: %s\n", SDL_GetError());
-        TTF_CloseFont(font);
-        TTF_Quit();
-        SDL_Quit();
+        cleanup_gui();
         exit(1);
     }
 
-    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
-    if (renderer == NULL) {
-        SDL_DestroyWindow(window);
+    gui.renderer = SDL_CreateRenderer(gui.window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+    if (gui.renderer == NULL) {
         fprintf(stderr, "SDL_CreateRenderer Error: %s\n", SDL_GetError());
-        TTF_CloseFont(font);
-        TTF_Quit();
-        SDL_Quit();
+        cleanup_gui();
         exit(1);
     }
 
-    screen_texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, SCREEN_X * font_width, SCREEN_Y * font_height);
-    if (screen_texture == NULL) {
-        SDL_DestroyRenderer(renderer);
-        SDL_DestroyWindow(window);
+    gui.texture = SDL_CreateTexture(gui.renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, SCREEN_X * gui.font->width, (SCREEN_Y + 1) * gui.font->height);
+    if (gui.texture == NULL) {
         fprintf(stderr, "SDL_CreateTexture Error: %s\n", SDL_GetError());
-        TTF_CloseFont(font);
-        TTF_Quit();
-        SDL_Quit();
+        cleanup_gui();
         exit(1);
     }
 
-    info_texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, SCREEN_X * font_width, font_height);
-    if (info_texture == NULL) {
-        SDL_DestroyTexture(screen_texture);
-        SDL_DestroyRenderer(renderer);
-        SDL_DestroyWindow(window);
-        fprintf(stderr, "SDL_CreateTexture Error: %s\n", SDL_GetError());
-        TTF_CloseFont(font);
-        TTF_Quit();
-        SDL_Quit();
+    if (SDL_LockTexture(gui.texture, NULL, (void **) &gui.fb, &gui.pitch) != 0) {
+        fprintf(stderr, "SDL_LockTexture Error: %s\n", SDL_GetError());
+        cleanup_gui();
         exit(1);
     }
-
-    memset(keyboard_buffer, 0, sizeof(keyboard_buffer));
-}
-
-void cleanup_gui(void) {
-    SDL_DestroyTexture(screen_texture);
-    SDL_DestroyTexture(info_texture);
-    SDL_DestroyRenderer(renderer);
-    SDL_DestroyWindow(window);
-    TTF_CloseFont(font);
-    TTF_Quit();
-    SDL_Quit();
 }
 
 void update_gui(void) {
-    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
-    SDL_RenderClear(renderer);
+    SDL_UnlockTexture(gui.texture);
 
-    SDL_Rect screen_rect = {0, 0, SCREEN_X * font_width, SCREEN_Y * font_height};
-    SDL_RenderCopy(renderer, screen_texture, NULL, &screen_rect);
- 
-    SDL_Rect info_rect = {0, SCREEN_Y * font_height, SCREEN_X * font_width, font_height};
-    SDL_RenderCopy(renderer, info_texture, NULL, &info_rect);
+    SDL_RenderClear(gui.renderer);
+    SDL_RenderCopy(gui.renderer, gui.texture, NULL, NULL);
+    SDL_RenderPresent(gui.renderer);
 
-    SDL_RenderPresent(renderer);
+    SDL_LockTexture(gui.texture, NULL, (void **) &gui.fb, &gui.pitch);
 }
 
-#define SMOOTHING_FACTOR 20
+#define SMOOTHING_FACTOR 5
 
 void gui_loop(uint64_t ips, uint64_t delta_time) {
     SDL_Event event;
@@ -200,15 +260,11 @@ void gui_loop(uint64_t ips, uint64_t delta_time) {
             kevent.type = (event.type == SDL_KEYDOWN) ? 1 : 2;
             kevent.value = event.key.keysym.sym;
 
-            if (keyboard_buffer_size < (int)(sizeof(keyboard_buffer) / sizeof(keyboard_event_t))) {
-                keyboard_buffer[keyboard_buffer_size++] = kevent;
+            if (gui.kbbuf_size < (int)(sizeof(gui.kbbuf) / sizeof(keyboard_event_t))) {
+                gui.kbbuf[gui.kbbuf_size++] = kevent;
             }
         }
     }
-
-    SDL_RenderClear(renderer);
-    SDL_Rect screen_rect = {0, 0, SCREEN_X * font_width, SCREEN_Y * font_height};
-    SDL_RenderCopy(renderer, screen_texture, NULL, &screen_rect);
 
     // Update the line 26 of the screen with the stack pointer value
     static double last_ips = 0;
@@ -228,21 +284,19 @@ void gui_loop(uint64_t ips, uint64_t delta_time) {
             last_ips = (double)ips;
             last_fps = 1000.0 / (double)(delta_time + 0.1);
         } else {
-            last_ips = (last_ips * (iter-1) + (double)ips) / iter; // smooth the IPS value
+            last_ips = (last_ips * (iter-1) + (double) ips) / iter;                        // smooth the IPS value
             last_fps = (last_fps * (iter-1) + 1000.0 / (double)(delta_time + 0.1)) / iter; // smooth the FPS value
         }
-        snprintf(str, sizeof(str), "CPU: %.1fMHz, FPS: %.1f", last_ips / 1000000, last_fps);
+        snprintf(str, sizeof(str), "CPU: %.1f MHz, FPS: %.1f", last_ips / 1000000, last_fps);
     }
     while (strlen(str) < 80) {
         strcat(str, " ");
     }
 
-    SDL_Color color = {255, 255, 255, 255}; // white color
-    SDL_Surface *surface = TTF_RenderText_Blended(font, str, color);
-    SDL_Texture *new_info_texture = SDL_CreateTextureFromSurface(renderer, surface);
-    SDL_FreeSurface(surface);
-    SDL_DestroyTexture(info_texture);
-    info_texture = new_info_texture;
+    // Render the info line
+    for (int i = 0; i < 80; i++) {
+        print_char(i * gui.font->width, SCREEN_Y * gui.font->height, str[i], 0xAAAAAAAA);
+    }
 
     update_gui();
 }
@@ -336,10 +390,10 @@ uint16_t port_in(uint16_t port) {
         case 0x1010:
             #ifdef GUI
             if (use_gui) {
-                if (keyboard_buffer_size == 0)
+                if (gui.kbbuf_size == 0)
                     return 0;
 
-                keyboard_event_t kevent = keyboard_buffer[0];
+                keyboard_event_t kevent = gui.kbbuf[0];
                 return kevent.type;
             }
             #endif
@@ -348,15 +402,15 @@ uint16_t port_in(uint16_t port) {
         case 0x1011:
             #ifdef GUI
             if (use_gui) {
-                if (keyboard_buffer_size == 0)
+                if (gui.kbbuf_size == 0)
                     return 0;
 
-                keyboard_event_t kevent = keyboard_buffer[0];
+                keyboard_event_t kevent = gui.kbbuf[0];
                 // shift the buffer
-                for (int i = 1; i < keyboard_buffer_size; i++) {
-                    keyboard_buffer[i - 1] = keyboard_buffer[i];
+                for (int i = 1; i < gui.kbbuf_size; i++) {
+                    gui.kbbuf[i - 1] = gui.kbbuf[i];
                 }
-                keyboard_buffer_size--;
+                gui.kbbuf_size--;
                 return kevent.value;
             }
             #endif
@@ -398,8 +452,7 @@ void port_out(uint16_t port, uint16_t value) {
         case 0x1020:
             #ifdef GUI
             if (use_gui) {
-                render_screen();
-                update_gui();
+                rwmem_to_screen();
                 break;
             }
             #endif
@@ -408,7 +461,7 @@ void port_out(uint16_t port, uint16_t value) {
         case 0x1021:
             #ifdef GUI
             if (use_gui) {
-                cursor_pos = value;
+                gui.cursor_pos = value;
                 break;
             }
             #endif
@@ -426,7 +479,7 @@ void execute_program() {
 
     #ifdef GUI
     int icount = 0;
-    int update_interval = 1000000;
+    int update_interval = 1000;
     uint64_t last_time = 0;
     uint64_t sleep_to = 0;
     #endif
@@ -628,18 +681,16 @@ void execute_program() {
                 }
             }
 
-            if (icount >= update_interval) {
+            if (icount % 10000 == 0) {
                 current_time = SDL_GetTicks();
                 uint64_t delta_time = current_time - last_time;
-                last_time = current_time;
 
-                uint64_t ips = (uint64_t) icount * 1000 / (double)(delta_time + 0.1);
-                gui_loop(ips, delta_time);
-
-                // recalculate the update interval based on the target FPS
-                update_interval = ((update_interval * 9) + (int)(ips / FPS_TARGET)) / 10;
-
-                icount = 0;
+                if (delta_time > (1000 / FPS_TARGET)) {
+                    last_time = current_time;
+                    uint64_t ips = (uint64_t) icount * 1000 / (double)(delta_time + 0.1);
+                    gui_loop(ips, delta_time);
+                    icount = 0;
+                }
             }
         }
         #endif
@@ -665,10 +716,10 @@ typedef struct {
 } file_header_t;
 
 typedef struct {
+    uint16_t type;
     uint16_t debut;
     uint16_t size;
     uint16_t dest_addr;
-    uint16_t type;
 } section_header_t;
 
 #define MAGIC_NUMBER 0xF057

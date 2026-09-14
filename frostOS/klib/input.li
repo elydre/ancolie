@@ -20,13 +20,15 @@ func input(buffer, size) {
         if chr '\b' == {
             if buffer_i 0 > {
                 buffer_i = buffer_i 1 -
-                print("\b")
+                putchar('\b')
+                screen_flush()
             }
             continue
         }
 
         if chr '\r' == {
-            print("\n")
+            putchar('\n')
+            screen_flush()
             [buffer buffer_i +] = 0
             return buffer_i
         }
@@ -34,6 +36,7 @@ func input(buffer, size) {
         if buffer_i size 1 - < {
             [buffer buffer_i +] = chr
             putchar(chr)
+            screen_flush()
             buffer_i = buffer_i 1 +
         }
     }
