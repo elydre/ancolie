@@ -127,6 +127,12 @@ OPCODES = [
     opcode("hlt",    0xFF, 0),
 ]
 
+def find_opcode(name):
+    for e in OPCODES:
+        if e.name == name:
+            return e
+    utl.say_error(f"(Internal) Unknown opcode: {name}")
+
 MEMORY_SIZE = 65536 - (80 * 25)
 
 MAGIC_NUMBER = 0xF057
@@ -153,6 +159,7 @@ CURRENT_LNO = 0
 CURRENT_SCOPE = "global"
 
 EXTRAERR = False
+VERBOSE = False
 
 LOCAL_VARS = {}
 STATIC_VARS = {}

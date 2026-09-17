@@ -76,9 +76,11 @@ class output_code:
             self.bytes = bytearray()
             self.psize = 0
             self.type = self.TYPE_NOTSET
+            self.lineno = defs.CURRENT_LNO
 
             self.goto_label = None
             self.goto_val = None
+            self.raw_args = None
 
         def setcomment(self, comment):
             self.type = self.TYPE_COMMENT
@@ -127,13 +129,10 @@ class output_code:
         def setopcode(self, opcode, v1, v2, v3, v4):
             self.type = self.TYPE_OPCODE
 
-            if not any(e.name == opcode for e in defs.OPCODES):
-                utl.say_error(f"(Internal) Unknown opcode: {opcode}")
+            op = defs.find_opcode(opcode)
 
             self.string = f"{opcode} "
             argc = 0
-
-            op = next(e for e in defs.OPCODES if e.name == opcode)
 
             b = bytearray()
             b.append(op.opcode)
@@ -160,19 +159,22 @@ class output_code:
 
                 argc += 1
 
+            self.raw_args = [opcode]
+
             for v in [v1, v2, v3, v4]:
                 if v == None:
                     break
                 b += v[1].to_bytes(2, byteorder='little')
+                self.raw_args.append(v)
 
             self.string = self.string.strip()
 
             if argc != op.argc:
                 utl.say_error(f"(Internal) Bad number of arguments for opcode {opcode}\nExpected {op.argc}, got {argc}")
 
-
             self.psize = len(b) // 2
             self.bytes = b
+
 
     def __init__(self):
         self.instructions = []

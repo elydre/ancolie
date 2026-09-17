@@ -22,6 +22,11 @@ def say_extra_error(message):
     print(f"Extra Error line {defs.CURRENT_LNO}: {message}")
     exit(1)
 
+def verbose(message):
+    if not defs.VERBOSE:
+        return
+    print(message)
+
 CURRENT_LABEL = 0
 
 def get_new_label():
