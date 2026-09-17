@@ -103,8 +103,8 @@ class output_code:
                 self.string += f"{hex(val[1])[2:]}"
             elif val[0] == 2: # val1 is a stack pointer offset
                 self.string += f"[sp+{hex(val[1])[2:]}]"
-            elif val[0] == 3: # val1 is a pointer
-                self.string += f"[[{hex(val[1])[2:]}]]"
+            elif val[0] == 3: # val1 is a user pointer offset
+                self.string += f"[up+{hex(val[1])[2:]}]"
 
             self.string += f" == 0"
 
@@ -149,14 +149,14 @@ class output_code:
 
                 if v == None:
                     break
-                if v[0] == 0: # val1 is a memory address
+                if v[0] == 0: # val is a memory address
                     self.string += f"[{hex(v[1])[2:]}] "
-                elif v[0] == 1: # val1 is a value
+                elif v[0] == 1: # val is a value
                     self.string += f"{hex(v[1])[2:]} "
-                elif v[0] == 2: # val1 is a stack pointer offset
+                elif v[0] == 2: # val is a stack pointer offset
                     self.string += f"[sp+{hex(v[1])[2:]}] "
-                elif v[0] == 3: # val1 is a pointer
-                    self.string += f"[[{hex(v[1])[2:]}]] "
+                elif v[0] == 3: # val is a user pointer offset
+                    self.string += f"[up+{hex(v[1])[2:]}] "
 
                 argc += 1
 
@@ -229,26 +229,26 @@ class output_code:
         pc = 0
         label_addresses = {}
 
-        # First pass: record label addresses
+        # first pass: record label addresses
         for instr in self.instructions:
             if instr.type == self.instruction.TYPE_LABEL:
                 label_addresses[instr.string] = pc
             pc += instr.psize
 
-        # Second pass: resolve goto instructions
+        # second pass: resolve goto instructions
         for instr in self.instructions:
             if instr.type == self.instruction.TYPE_GOTO:
                 resolved_address = label_addresses.get(instr.goto_label)
                 if resolved_address is None:
                     utl.say_error(f"(Internal) Unknown label: {instr.goto_label}")
-                # Replace the goto instruction with a jmp instruction
+                # replace the goto instruction with a jmp instruction
                 instr.setopcode("jmp", (1, resolved_address), instr.goto_val, None, None)
             
             elif instr.type == self.instruction.TYPE_PUSH_LABEL:
                 resolved_address = label_addresses.get(instr.goto_label)
                 if resolved_address is None:
                     utl.say_error(f"(Internal) Unknown label: {instr.goto_label}")
-                # Replace the push_label instruction with a push instruction
+                # replace the push_label instruction with a push instruction
                 instr.setopcode("push", (1, resolved_address), None, None, None)
 
     def to_bytes(self):

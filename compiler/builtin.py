@@ -1,5 +1,5 @@
-import compiler.defs as defs
 import compiler.output as out
+import compiler.defs as defs
 import compiler.op as op
 
 def blt_alloca(args: list):
@@ -43,15 +43,6 @@ def blt_in(args: list):
 
     output.atend(op.calculate_rpn(args[0]))
     output.add("in", (0, defs.FUNC_RET_ADDR), (2, 0))
-    output.add("pop", (1, 0))
-
-    return output
-
-def blt_sleep(args: list):
-    output = out.output_code()
-
-    output.atend(op.calculate_rpn(args[0]))
-    output.add("sleep", (2, 0))
     output.add("pop", (1, 0))
 
     return output
@@ -128,7 +119,6 @@ def add_builtin_functions():
     defs.func("alloca",      1, True,  is_builtin=True, blt_handler = blt_alloca, no_rpn=True).add()
     defs.func("out",         2, False, is_builtin=True, blt_handler = blt_out).add()
     defs.func("in",          1, True,  is_builtin=True, blt_handler = blt_in).add()
-    defs.func("sleep",       1, False, is_builtin=True, blt_handler = blt_sleep).add()
     defs.func("dump",        1, False, is_builtin=True, blt_handler = blt_dump).add()
     defs.func("memset",      3, False, is_builtin=True, blt_handler = blt_memset).add()
     defs.func("memmov",      3, False, is_builtin=True, blt_handler = blt_memmov).add()

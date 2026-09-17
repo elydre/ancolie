@@ -10,8 +10,17 @@
 #include <fcntl.h>
 #endif
 
-#define MEMORY_SIZE 65536
+// emulator memory
+#define MEMORY_SIZE   65536
 #define SCREEN_MEMORY 63536
+
+// binary file format
+#define MAGIC_NUMBER 0xF057
+#define ARCH_VERSION 0x0100
+#define MAX_SECTIONS 16
+
+#define SECTION_TYPE_CODE 0
+#define SECTION_TYPE_DATA 1
 
 #undef min
 #define min(a, b) ((a) < (b) ? (a) : (b))
@@ -19,13 +28,26 @@
 #ifdef DEBUG
 #define DEBUGF(fmt, ...) printf(fmt, ##__VA_ARGS__)
 #else
-#define DEBUGF(fmt, ...) do {} while (0)
+#define DEBUGF(fmt, ...)
 #endif
 
 uint16_t *xmem, *rwmem;
-uint16_t sp; // stack pointer
+uint16_t sp, up; // stack pointer and user pointer
 
 int use_gui;
+
+typedef struct {
+    uint16_t magic;
+    uint16_t version;
+    uint16_t section_count;
+} file_header_t;
+
+typedef struct {
+    uint16_t type;
+    uint16_t debut;
+    uint16_t size;
+    uint16_t dest_addr;
+} section_header_t;
 
 #ifdef GUI
 
@@ -51,8 +73,9 @@ typedef struct {
     SDL_Window *window;
     SDL_Renderer *renderer;
     SDL_Texture *texture;
-
     font_data_t *font;
+
+    uint64_t sleep_ticks;
     int cursor_pos;
 
     keyboard_event_t kbbuf[256];
@@ -116,7 +139,7 @@ void rwmem_to_screen(void) {
     cursor_x = gui.cursor_pos % SCREEN_X;
     cursor_y = gui.cursor_pos / SCREEN_X;
 
-    for (int y = 0; y < gui.font->height; y++) {
+    for (uint32_t y = 0; y < gui.font->height; y++) {
         for (int x = 1; x < 3; x++) {
             gui.fb[(cursor_x * gui.font->width + x) + (cursor_y * gui.font->height + y) * (gui.pitch / 4)] ^= 0xAAAAAAAA;
         }
@@ -154,8 +177,8 @@ font_data_t *load_psf_font(const char *path) {
 
     if (magic != 0x864ab572 || version != 0)
         return NULL;
-    
-    size_t size = charcount * charsize;
+
+    int size = charcount * charsize;
     uint8_t *font = malloc(size);
 
     if (pread(fd, font, size, headersize) != size) {
@@ -303,46 +326,46 @@ void gui_loop(uint64_t ips, uint64_t delta_time) {
 #endif
 
 static inline uint16_t RVAL(uint8_t source, uint16_t val) {
-    if (source == 0)
-        DEBUGF("RVAL: [%04X] = %04X\n", val, rwmem[val]);
-    else if (source == 1)
-        DEBUGF("RVAL: %04X = %04X pass\n", val, val);
-    else if (source == 2)
-        DEBUGF("RVAL: [sp+%X] = %04X\n", val, rwmem[rwmem[sp] + val]);
-    else if (source == 3)
-        DEBUGF("RVAL: [[%04X]] = %04X\n", val, rwmem[rwmem[val]]);
-
     switch (source) {
-        case 0: return rwmem[val];
-        case 1: return val;
-        case 2: return rwmem[rwmem[sp] + val];
-        // case 3: return rwmem[rwmem[val]];
-        default: {
+        case 0:
+            DEBUGF("[%04X] => %04X\n", val, rwmem[val]);
+            return rwmem[val];
+        case 1:
+            DEBUGF("%04X\n", val);
+            return val;
+        case 2:
+            DEBUGF("[sp+%X=%04X] => %04X\n", val, (rwmem[sp] + val) & 0xFFFF, rwmem[rwmem[sp] + val]);
+            return rwmem[(rwmem[sp] + val) & 0xFFFF];
+        case 3:
+            DEBUGF("[up+%X=%04X] => %04X\n", val, (rwmem[up] + val) & 0xFFFF, rwmem[rwmem[up] + val]);
+            return rwmem[(rwmem[up] + val) & 0xFFFF];
+        default:
             fprintf(stderr, "Error: Invalid source type %d\n", source);
             exit(1);
-        }
     }
 }
 
 static inline void WVAL(uint16_t addr, uint8_t source, uint16_t value) {
-    if (source == 0)
-        DEBUGF("WVAL: [%04X] = %04X\n", addr, value);
-    else if (source == 1)
-        DEBUGF("WVAL: %04X = %04X pass\n", addr, value);
-    else if (source == 2)
-        DEBUGF("WVAL: [sp+%X] = %04X\n", addr, value);
-    else if (source == 3)
-        DEBUGF("WVAL: [[%04X]] = %04X\n", addr, value);
-
     switch (source) {
-        case 0: rwmem[addr] = value; break;
-        case 1: break; // cannot write to immediate value
-        case 2: rwmem[rwmem[sp] + addr] = value; break;
-        // case 3: rwmem[rwmem[addr]] = value; break;
-        default: {
+        case 0:
+            DEBUGF("[%04X] <= %04X\n", addr, value);
+            rwmem[addr] = value;
+            break;
+        case 1:
+            DEBUGF("%04X <= %04X pass\n", addr, value);
+            // cannot write to immediate value
+            break;
+        case 2:
+            DEBUGF("[sp+%X=%04X] <= %04X\n", addr, (rwmem[up] + addr) & 0xFFFF, value);
+            rwmem[(rwmem[sp] + addr) & 0xFFFF] = value;
+            break;
+        case 3:
+            DEBUGF("[up+%X=%04X] <= %04X\n", addr, (rwmem[up] + addr) & 0xFFFF, value);
+            rwmem[(rwmem[up] + addr) & 0xFFFF] = value;
+            break;
+        default:
             fprintf(stderr, "Error: Invalid source type %d\n", source);
             exit(1);
-        }
     }
 }
 
@@ -368,7 +391,7 @@ char *opcode_to_string(uint8_t opcode) {
         case 0x11: return "jmpr";
         case 0x12: return "out";
         case 0x13: return "in";
-        case 0x14: return "sleep";
+        case 0x14: return "sup";
         case 0x15: return "ssp";
         case 0x16: return "mss";
         case 0x17: return "pushs";
@@ -467,6 +490,17 @@ void port_out(uint16_t port, uint16_t value) {
             #endif
             fprintf(stderr, "Cursor position update requested but GUI is not enabled\n");
             break;
+        case 0x1031:
+            #ifdef GUI
+            if (use_gui) {
+                gui.sleep_ticks = SDL_GetTicks() + value * 50; // minecraft tick
+            } else {
+            #endif
+                usleep(value * 50000); // minecraft tick
+            #ifdef GUI
+            }
+            #endif
+            break;
         default:
             fprintf(stderr, "Output to port 0x%04X: %04X\n", port, value);
             break;
@@ -478,10 +512,8 @@ void execute_program() {
     pc = sp = 0;
 
     #ifdef GUI
-    int icount = 0;
-    int update_interval = 1000;
     uint64_t last_time = 0;
-    uint64_t sleep_to = 0;
+    int icount = 0;
     #endif
 
     while (1) {
@@ -582,21 +614,12 @@ void execute_program() {
                 WVAL(xmem[pc], source0, port_in(RVAL(source1, xmem[pc + 1])));
                 pc += 2;
                 break;
-            case 0x14: // sleep
-                #ifdef GUI
-                if (use_gui) {
-                    sleep_to = SDL_GetTicks() + RVAL(source0, xmem[pc]) * 50; // minecraft tick
-                } else {
-                #endif
-                    usleep(RVAL(source0, xmem[pc]) * 50000); // minecraft tick
-                #ifdef GUI
-                }
-                #endif
-
+            case 0x14: // ssp
+                sp = RVAL(source0, xmem[pc]);
                 pc++;
                 break;
-            case 0x15: // ssp
-                sp = RVAL(source0, xmem[pc]);
+            case 0x15: // sup
+                up = RVAL(source0, xmem[pc]);
                 pc++;
                 break;
             case 0x16: // mss
@@ -667,17 +690,17 @@ void execute_program() {
             uint64_t current_time;
             icount++;
 
-            while (sleep_to > 0) {
+            while (gui.sleep_ticks > 0) {
                 current_time = SDL_GetTicks();
 
-                int to_sleep = min((int)(sleep_to - current_time), (int)(current_time - last_time));
+                int to_sleep = min((int)(gui.sleep_ticks - current_time), (int)(current_time - last_time));
                 last_time = current_time;
 
                 if (to_sleep > 0) {
                     gui_loop(0, 0);
                     usleep(to_sleep * 1000);
                 } else {
-                    sleep_to = 0;
+                    gui.sleep_ticks = 0;
                 }
             }
 
@@ -695,6 +718,7 @@ void execute_program() {
         }
         #endif
 
+        #ifdef DEBUG
         // print the beginning of the stack
         DEBUGF("\033[90m[ ");
         for (int i = 0; i < 5; i++) {
@@ -703,33 +727,12 @@ void execute_program() {
             DEBUGF("%04X ", rwmem[rwmem[sp] + i]);
         }
         DEBUGF("]\033[0m\n");
+        #endif
 
         if (pc >= MEMORY_SIZE - 10)
             return;
     }
 }
-
-typedef struct {
-    uint16_t magic;
-    uint16_t version;
-    uint16_t section_count;
-} file_header_t;
-
-typedef struct {
-    uint16_t type;
-    uint16_t debut;
-    uint16_t size;
-    uint16_t dest_addr;
-} section_header_t;
-
-#define MAGIC_NUMBER 0xF057
-#define ARCH_VERSION 1
-#define MAX_SECTIONS 16
-
-#define SECTION_TYPE_CODE 0
-#define SECTION_TYPE_DATA 1
-
-
 
 int main(int argc, char **argv) {
     char *filename = NULL;

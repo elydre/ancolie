@@ -1,0 +1,21 @@
+:vsrc
+$ssrc
+
+:v1
+:v2
+$s1
+$s2
+
+vsrc = 5
+ssrc = 2
+
+v1 = vsrc
+s1 = vsrc
+
+v2 = ssrc
+s2 = ssrc
+
+dump(v1)
+dump(s1)
+dump(v2)
+dump(s2)

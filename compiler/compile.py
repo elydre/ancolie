@@ -105,9 +105,8 @@ def compile_line(lines: list, current_line: int, labels: tuple = None):
             if v.is_static:
                 output.add("pop", (0, v.addr))
             else:
-                output.add("pops",
-                        (0, defs.STACK_DEBUT_PTR),
-                        (1, utl.to_u16(-v.offset)))
+                output.add("pop",
+                        (3, utl.to_u16(-v.offset)))
 
 
     elif tokens[0] == "[":
@@ -279,9 +278,8 @@ def compile_line(lines: list, current_line: int, labels: tuple = None):
             output.atend(op.calculate_rpn(args[0]))
 
             # move the result from the stack to the variable's memory location
-            output.add("pops",
-                    (0, defs.STACK_DEBUT_PTR),
-                    (1, utl.to_u16(-v.offset)))
+            output.add("pop",
+                    (3, utl.to_u16(-v.offset)))
             
         debut_label = utl.get_new_label()
         next_label  = utl.get_new_label()
@@ -295,9 +293,8 @@ def compile_line(lines: list, current_line: int, labels: tuple = None):
         
         if len(args) == 2:
             # compare the loop variable with the fin value
-            output.add("pushs",
-                    (0, defs.STACK_DEBUT_PTR),
-                    (1, utl.to_u16(-v.offset)))
+            output.add("push",
+                    (3, utl.to_u16(-v.offset)))
             output.add("lt",
                     (2, 0), (2, 1))
             output.add("pop",
@@ -315,14 +312,12 @@ def compile_line(lines: list, current_line: int, labels: tuple = None):
         output.add_comment(f"\nIncrement the loop variable {v.name}")
 
         output.add_label(next_label)
-        output.add("pushs",
-                (0, defs.STACK_DEBUT_PTR),
-                (1, utl.to_u16(-v.offset)))
+        output.add("push",
+                (3, utl.to_u16(-v.offset)))
         output.add("add",
                 (2, 0), (1, 1))
-        output.add("pops",
-                (0, defs.STACK_DEBUT_PTR),
-                (1, utl.to_u16(-v.offset)))
+        output.add("pop",
+                (3, utl.to_u16(-v.offset)))
         
         output.add_goto(
             debut_label, (1, 0)) # unconditional jump to the beginning of the for loop

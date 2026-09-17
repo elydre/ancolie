@@ -5,4 +5,4 @@ func fibo(n) {
     return fibo(n 1 -) fibo(n 2 -) +
 }
 
-fibo(10)
+dump(fibo(10))

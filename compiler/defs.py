@@ -117,8 +117,8 @@ OPCODES = [
     opcode("jmpr",   0x11, 2),
     opcode("out",    0x12, 2),
     opcode("in",     0x13, 2),
-    opcode("sleep",  0x14, 1),
-    opcode("ssp",    0x15, 1),
+    opcode("ssp",    0x14, 1),
+    opcode("sup",    0x15, 1),
     opcode("mss",    0x16, 4),
     opcode("pushs",  0x17, 2),
     opcode("pops",   0x18, 2),
@@ -130,7 +130,7 @@ OPCODES = [
 MEMORY_SIZE = 65536 - (80 * 25)
 
 MAGIC_NUMBER = 0xF057
-ARCH_VERSION = 0x0001
+ARCH_VERSION = 0x0100
 
 CHARS_SPE = [",", "(", ")", ":", "=", "{", "}", "[", "]", "&", "$", "!", "//", "' '", "#"]
 CHARS_OPR = ["+", "-", "*", "/", "%", "==", "!=", "<", ">", "&&", "|"]

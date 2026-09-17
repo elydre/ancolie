@@ -6,7 +6,7 @@ func input(buffer, size) {
         type = in(0x1010)
         if type 0 == {
             // nothing for now
-            sleep(1)
+            out(0x1031, 1)
             continue
         }
         if type 2 == {

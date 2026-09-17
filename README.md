@@ -105,48 +105,47 @@ opcode (8 bit)  sources (4 * 2bit)  [  arg0 (16 bit)   ] ... [ arg3 (16 bit)    
 (arguments quantity is determined by the opcode)
 ```
 
-| OPCODE | ARGUMENTS   | DESCRIPTION                |
-| ------ | ----------- | ---------------------------|
-|  nop   |             | no operation               |
-|        |             |                            |
-|  mov   | `a` `b`     | `a <- b`                   |
-|        |             |                            |
-|  push  | `a`         | `sp--`, `[sp] <- a`        |
-|  pop   | `a`         | `a <- [sp]`, `sp++`        |
-|        |             |                            |
-|  sub   | `a` `b`     | `a <- a - b`               |
-|  add   | `a` `b`     | `a <- a + b`               |
-|  mul   | `a` `b`     | `a <- a * b`               |
-|  div   | `a` `b`     | `a <- a / b`               |
-|  mod   | `a` `b`     | `a <- a % b`               |
-|        |             |                            |
-|  eq    | `a` `b`     | `a <- a == b`              |
-|  neq   | `a` `b`     | `a <- a != b`              |
-|  lt    | `a` `b`     | `a <- a < b`               |
-|  gt    | `a` `b`     | `a <- a > b`               |
-|        |             |                            |
-|  and   | `a` `b`     | `a <- a && b`              |
-|  band  | `a` `b`     | `a <- a & b`               |
-|  bor   | `a` `b`     | `a <- a bor b` (md sorry)  |
-|        |             |                            |
-|  jmp   | `a` `b`     | `pc  = a if b == 0`        |
-|  jmpr  | `a` `b`     | `pc += a if b == 0`        |
-|        |             |                            |
-|  out   | `port` `a`  | output `a` to `port`       |
-|  in    | `a` `port`  | input from `port` to `a`   |
-|        |             |                            |
-|  sleep | `a`         | sleep for `a` ticks        |
-|        |             |                            |
-|  ssp   | `a`         | `sp <- a`                  |
-|        |             |                            |
-|  mss   | `A` `a` `B` `b` | `[A + a] <- [B + b]`   |
-|  pushs | `A` `a`     | `sp--`, `[sp] <- [A + a]`  |
-|  pops  | `A` `a`     | `[A + a] <- [sp]`, `sp++`  |
-|        |             |                            |
-| memset | `a` `b` `c` | `memset(addr=a val=b s=c)` |
-| memmov | `a` `b` `c` | `memmov(dest=a src=b s=c)` |
-|        |             |                            |
-|  hlt   |             | halt the computer          |
+| NUMBER | OPCODE | ARGUMENTS   | DESCRIPTION                |
+| ------ | ------ | ----------- | ---------------------------|
+| `0x00` |  nop   |             | no operation               |
+|        |        |             |                            |
+| `0x01` |  mov   | `a` `b`     | `a <- b`                   |
+|        |        |             |                            |
+| `0x02` |  push  | `a`         | `sp--`, `[sp] <- a`        |
+| `0x03` |  pop   | `a`         | `a <- [sp]`, `sp++`        |
+|        |        |             |                            |
+| `0x04` |  sub   | `a` `b`     | `a <- a - b`               |
+| `0x05` |  add   | `a` `b`     | `a <- a + b`               |
+| `0x06` |  mul   | `a` `b`     | `a <- a * b`               |
+| `0x07` |  div   | `a` `b`     | `a <- a / b`               |
+| `0x08` |  mod   | `a` `b`     | `a <- a % b`               |
+|        |        |             |                            |
+| `0x09` |  eq    | `a` `b`     | `a <- a == b`              |
+| `0x0A` |  neq   | `a` `b`     | `a <- a != b`              |
+| `0x0B` |  lt    | `a` `b`     | `a <- a < b`               |
+| `0x0C` |  gt    | `a` `b`     | `a <- a > b`               |
+|        |        |             |                            |
+| `0x0D` |  and   | `a` `b`     | `a <- a && b`              |
+| `0x0E` |  band  | `a` `b`     | `a <- a & b`               |
+| `0x0F` |  bor   | `a` `b`     | `a <- a bor b` (md sorry)  |
+|        |        |             |                            |
+| `0x10` |  jmp   | `a` `b`     | `pc  = a if b == 0`        |
+| `0x11` |  jmpr  | `a` `b`     | `pc += a if b == 0`        |
+|        |        |             |                            |
+| `0x12` |  out   | `port` `a`  | output `a` to `port`       |
+| `0x13` |  in    | `a` `port`  | input from `port` to `a`   |
+|        |        |             |                            |
+| `0x14` |  ssp   | `a`         | `sp <- a`                  |
+| `0x15` |  sup   | `a`         | `up <- a`                  |
+|        |        |             |                            |
+| `0x16` |  mss   | `A` `a` `B` `b` | `[A + a] <- [B + b]`   |
+| `0x17` |  pushs | `A` `a`     | `sp--`, `[sp] <- [A + a]`  |
+| `0x18` |  pops  | `A` `a`     | `[A + a] <- [sp]`, `sp++`  |
+|        |        |             |                            |
+| `0x19` | memset | `a` `b` `c` | `memset(addr=a val=b s=c)` |
+| `0x1A` | memmov | `a` `b` `c` | `memmov(dest=a src=b s=c)` |
+|        |        |             |                            |
+| `0xFF` |  hlt   |             | halt the computer          |
 
 each argument can be one of the following:
 
@@ -155,7 +154,7 @@ each argument can be one of the following:
 |  0     | `[a]`       | memory address  |
 |  1     | `a`         | value           |
 |  2     | `sp+a`      | stack address   |
-|  3     | `?`         | unused          |
+|  3     | `up+a`      | base + offset   |
 
 ### Used ports
 
@@ -179,9 +178,10 @@ each argument can be one of the following:
 | `0x1011`     | in        | get kb char and pop it from the buffer         |
 | **screen**   | -         | -                                              |
 | `0x1020`     | out       | flush the screen from memory                   |
-| `0x1021`     | out       | set cursor position (`x + y*80`)               |
+| `0x1021`     | out       | set cursor position (`n = x + y*80`)           |
 | **clock**    | -         | -                                              |
 | `0x1030`     | in        | get ingame time in ticks                       |
+| `0x1031`     | out       | sleep for `n` ticks (1 tick = 50ms)            |
 
 
 ## Compiled file format

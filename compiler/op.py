@@ -1,7 +1,7 @@
+import compiler.tokens as toks
 import compiler.output as out
 import compiler.utils as utl
 import compiler.defs as defs
-import compiler.tokens as toks
 import compiler.op as op
 
 
@@ -13,6 +13,8 @@ def init():
 
     output.add("ssp",
             (1, defs.STACK_PTR))
+    output.add("sup",
+            (1, defs.STACK_DEBUT_PTR))
     output.add("mov",
             (0, defs.STACK_PTR),
             (1, stack_debut))
@@ -71,9 +73,8 @@ def calculate_rpn(rpn: list):
                     output.add("push",
                             (0, v.addr))
                 else:
-                    output.add("pushs",
-                        (0, defs.STACK_DEBUT_PTR),
-                        (1, utl.to_u16(-v.offset)))
+                    output.add("push",
+                        (3, utl.to_u16(-v.offset)))
             stack_size += 1
             continue
 
@@ -202,20 +203,20 @@ def fast_assign_var(v: defs.variable, tokens: list):
 
         if v.is_static and v2.is_static:
             output.add("mov",
-                    (0, v2.addr),
-                    (1, v.addr))
+                    (0, v.addr),
+                    (0, v2.addr))
         elif v.is_static and not v2.is_static:
-            output.add("mss",
-                    (0, defs.STACK_DEBUT_PTR), (1, utl.to_u16(-v2.offset)),
-                    (1, v.addr), (1, 0))
+            output.add("mov",
+                    (0, v.addr),
+                    (3, utl.to_u16(-v2.offset)))
         elif not v.is_static and v2.is_static:
-            output.add("mss",
-                    (1, v2.addr), (1, 0),
-                    (0, defs.STACK_DEBUT_PTR), (1, utl.to_u16(-v.offset)))
+            output.add("mov",
+                    (3, utl.to_u16(-v.offset)),
+                    (0, v2.addr))
         else:
-            output.add("mss",
-                    (0, defs.STACK_DEBUT_PTR), (1, utl.to_u16(-v.offset)),
-                    (0, defs.STACK_DEBUT_PTR), (1, utl.to_u16(-v2.offset)))
+            output.add("mov",
+                    (3, utl.to_u16(-v.offset)),
+                    (3, utl.to_u16(-v2.offset)))
 
         return output
 
@@ -231,9 +232,9 @@ def fast_assign_var(v: defs.variable, tokens: list):
         output.atend(op.call_func(f, tokens[2:-1]))
 
         # move the result from FUNC_RET_ADDR to the variable's memory location
-        output.add("mss",
-                (0, defs.STACK_DEBUT_PTR), (1, utl.to_u16(-v.offset)),
-                (1, defs.FUNC_RET_ADDR), (1, 0))
+        output.add("mov",
+                (3, utl.to_u16(-v.offset)),
+                (0, defs.FUNC_RET_ADDR))
 
         return output
 
@@ -290,9 +291,8 @@ def load_ptraddr(tokens: list):
         output.add("push",
                 (0, ptr.addr))
     else:
-        output.add("pushs",
-                (0, defs.STACK_DEBUT_PTR),
-                (1, utl.to_u16(-ptr.offset)))
+        output.add("push",
+                (3, utl.to_u16(-ptr.offset)))
 
     return (output, end + 1)
 
@@ -324,9 +324,10 @@ def call_func(f: defs.func, tokens: list):
             (0, defs.STACK_DEBUT_PTR),
             (0, defs.STACK_PTR))
 
-    output.add("add",
-            (0, defs.STACK_DEBUT_PTR),
-            (1, utl.to_u16(f.argc)))
+    if f.argc > 0:
+        output.add("add",
+                (0, defs.STACK_DEBUT_PTR),
+                (1, utl.to_u16(f.argc)))
 
     output.add_goto(f"func_{f.name}", (1, 0)) # unconditional jump to the function's code
 
