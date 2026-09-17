@@ -37,7 +37,7 @@ gcc -DGUI -o emulator emulator.c -lSDL2 -lSDL2_ttf
 - [x] comments
 - [x] functions
 - [x] some optimizations
-- [ ] preprocessor
+- [ ] preprocessor *- in progress*
 - [ ] function with variable arguments
 - [ ] heap arrays
 - [ ] sub stack scope
@@ -50,8 +50,8 @@ gcc -DGUI -o emulator emulator.c -lSDL2 -lSDL2_ttf
 - [x] C emulator
 - [x] basic command line interface for compiler
 - [x] add screen to the emulator
-- [ ] langage documentation
-- [ ] create a basic operating system
+- [ ] langage documentation *- in progress*
+- [ ] create a basic operating system *- in progress*
 
 ## ancolie language
 
