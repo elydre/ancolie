@@ -36,13 +36,13 @@ gcc -DGUI -o emulator emulator.c -lSDL2 -lSDL2_ttf
 - [x] heap strings
 - [x] comments
 - [x] functions
+- [x] some optimizations
 - [ ] preprocessor
 - [ ] function with variable arguments
 - [ ] heap arrays
 - [ ] sub stack scope
 - [ ] structs
 - [ ] asm statements
-- [ ] some optimizations
 - [ ] multiple source files
 
 ### Extra
