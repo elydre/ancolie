@@ -39,10 +39,10 @@ gcc -DGUI -o emulator emulator.c -lSDL2 -lSDL2_ttf
 - [x] some optimizations
 - [x] sub stack scope
 - [x] variable arguments function
+- [x] asm statements
 - [ ] preprocessor *- in progress*
 - [ ] heap arrays
 - [ ] structs
-- [ ] asm statements
 - [ ] multiple source files
 
 ### Extra
@@ -153,8 +153,8 @@ each argument can be one of the following:
 | ------ | ----------- | --------------- |
 |  0     | `[a]`       | memory address  |
 |  1     | `a`         | value           |
-|  2     | `sp+a`      | stack address   |
-|  3     | `up+a`      | base + offset   |
+|  2     | `[sp+a]`    | stack address   |
+|  3     | `[up+a]`    | base + offset   |
 
 ### Used ports
 

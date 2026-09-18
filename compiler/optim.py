@@ -31,7 +31,12 @@ class opti_pattern:
             return None
 
         for i, pline in enumerate(self.pattern):
-            sline = code.instructions[i + start].raw_args
+            instr = code.instructions[start + i]
+
+            if instr.dont_optimize:
+                return None
+
+            sline = instr.raw_args
             if not sline or len(pline) != len(sline):
                 return None
 

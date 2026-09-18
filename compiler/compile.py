@@ -7,6 +7,77 @@ import compiler.defs as defs
 import compiler.op as op
 
 
+def compile_assembly(lines):
+    output = out.output_code()
+
+    asm_id = utl.get_new_userasm()
+
+    for line in lines:
+        defs.CURRENT_LNO, tokens = line
+
+        if len(tokens) < 1:
+            continue
+
+        # label definition
+        if len(tokens) == 2 and tokens[1] == ":":
+            label = f"{asm_id}_{tokens[0]}"
+            if not defs.is_valid_name(tokens[0]):
+                utl.say_error(f"Invalid label name: {tokens[0]}")
+            if output.does_label_exist(label):
+                utl.say_error(f"Label already exists: {tokens[0]}")
+            output.add_label(label)
+            continue
+
+        # check if the first token is a valid opcode
+        if not defs.is_opcode(tokens[0]):
+            utl.say_error(f"Unknown opcode: {tokens[0]}")
+
+        opcode = defs.get_opcode(tokens[0])
+        args = toks.split_func_args(tokens[1:])
+
+        if len(args) != opcode.argc:
+            utl.say_error(f"Opcode {opcode.name} expects {opcode.argc} arguments, got {len(args)}")
+
+        gen = []
+        label = None
+
+        for e in args:
+            if len(e) == 1 and utl.is_number(e[0]):
+                gen.append((1, utl.to_number(e[0])))
+            elif len(e) == 1 and opcode.name == "jmp":
+                label = f"{asm_id}_{e[0]}"
+                if output.does_label_exist(label):
+                    continue
+                utl.say_error(f"Label {e[0]} does not exist")
+            elif len(e) == 2 and e[0] == "&" and defs.is_variable(e[1]):
+                v = defs.get_variable(e[1])
+                if v.is_static:
+                    gen.append((0, v.addr))
+                else:
+                    gen.append((3, utl.to_u16(-v.offset)))
+            elif len(e) == 3 and e[0] == "[" and utl.is_number(e[1]) and e[2] == "]":
+                gen.append((0, utl.to_number(e[1])))
+            elif len(e) == 3 and e[0] == "[" and e[1] in ["sp", "up"] and e[2] == "]":
+                gen.append((2 if e[1] == "sp" else 3, 0))
+            elif len(e) == 5 and e[0] == "[" and e[1] in ["sp", "up"] and e[2] in ["+", "-"] and utl.is_number(e[3]) and e[4] == "]":
+                gen.append((2 if e[1] == "sp" else 3, utl.to_u16(utl.to_number(e[3]) * (1 if e[2] == "+" else -1))))
+            else:
+                utl.say_error(f"Bad argument syntax\nSyntax example: 123 OR &var_name OR [123] OR [sp+123] OR [up+123]")
+
+        if label is None:
+            output.add(opcode.name, *gen)
+            continue
+
+        if len(gen) != 1:
+            utl.say_error(f"(Internal) Unexpected number of arguments for jump")
+
+        output.add_goto(label, *gen)
+
+    output.set_dont_optimize()
+
+    return output
+
+
 def compile_lines(lines: list, size: int, labels: tuple = None, new_scope: str = None):
     output = out.output_code()
 
@@ -401,6 +472,18 @@ def compile_line(lines: list, current_line: int, labels: tuple = None):
                 (0, defs.STACK_DEBUT_PTR))
 
         return (output, closing_line - current_line + 1) # return the number of lines to skip
+
+    elif tokens[0] == "asm":
+        if len(tokens) != 1:
+            utl.say_error("Nothing expected after asm keyword\nSyntax example: asm { ... }")
+
+        # compile the lines inside the sub block
+        closing_line = toks.locate_braces(lines, current_line)
+
+        output.atend(compile_assembly(lines[current_line + 2:closing_line]))
+
+        return (output, closing_line - current_line + 1) # return the number of lines to skip
+
 
     elif tokens[0] == "break":
         if not labels:

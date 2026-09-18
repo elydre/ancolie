@@ -81,6 +81,7 @@ class output_code:
             self.goto_label = None
             self.goto_val = None
             self.raw_args = None
+            self.dont_optimize = False
 
         def setcomment(self, comment):
             self.type = self.TYPE_COMMENT
@@ -129,7 +130,7 @@ class output_code:
         def setopcode(self, opcode, v1, v2, v3, v4):
             self.type = self.TYPE_OPCODE
 
-            op = defs.find_opcode(opcode)
+            op = defs.get_opcode(opcode)
 
             self.string = f"{opcode} "
             argc = 0
@@ -209,6 +210,16 @@ class output_code:
 
     def atend(self, other):
         self.instructions += other.instructions
+
+    def does_label_exist(self, label):
+        for instr in self.instructions:
+            if instr.type == self.instruction.TYPE_LABEL and instr.string == label:
+                return True
+        return False
+
+    def set_dont_optimize(self, value = True):
+        for instr in self.instructions:
+            instr.dont_optimize = value
 
     def dump(self, hide_labels = False):
         pc = 0

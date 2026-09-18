@@ -35,6 +35,14 @@ def get_new_label():
     CURRENT_LABEL += 1
     return label
 
+CURRENT_USERASM = 0
+
+def get_new_userasm():
+    global CURRENT_USERASM
+    label = f"userasm_{CURRENT_USERASM}"
+    CURRENT_USERASM += 1
+    return label
+
 def to_u16(value):
     return ctypes.c_ushort(value).value
 

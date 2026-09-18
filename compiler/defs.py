@@ -76,6 +76,7 @@ def get_variable(s, scope = None):
     
     utl.say_error(f"Unknown variable: {s}")
 
+
 def is_func(s):
     return s in [e.name for e in ALL_FUNCS]
 
@@ -84,6 +85,17 @@ def get_func(s):
         utl.say_error(f"Unknown function: {s}")
 
     return next(e for e in ALL_FUNCS if e.name == s)
+
+
+def is_opcode(s):
+    return s in [e.name for e in OPCODES]
+
+def get_opcode(name):
+    for e in OPCODES:
+        if e.name == name:
+            return e
+    utl.say_error(f"(Internal) Unknown opcode: {name}")
+
 
 def is_valid_name(s):
     if not s:
@@ -96,6 +108,7 @@ def is_valid_name(s):
     if s in KEYWORDS:
         return False
     return True
+
 
 OPCODES = [
     opcode("nop",    0x00, 0),
@@ -127,12 +140,6 @@ OPCODES = [
     opcode("memmov", 0x1A, 3),    
     opcode("hlt",    0xFF, 0),
 ]
-
-def find_opcode(name):
-    for e in OPCODES:
-        if e.name == name:
-            return e
-    utl.say_error(f"(Internal) Unknown opcode: {name}")
 
 MEMORY_SIZE = 65536 - (80 * 25)
 
