@@ -300,7 +300,7 @@ def load_ptraddr(tokens: list):
 def call_func(f: defs.func, tokens: list):
     args = toks.split_func_args(tokens)
 
-    if len(args) != f.argc:
+    if not f.is_vaargs and len(args) != f.argc:
         utl.say_error(f"Wrong number of arguments for function {f.name}\nSyntax example: {f.name}({', '.join(['var' + str(i + 1) for i in range(f.argc)])})")
 
     if f.is_builtin:
@@ -310,6 +310,10 @@ def call_func(f: defs.func, tokens: list):
 
     end_label = utl.get_new_label()
 
+    if f.is_vaargs:
+        for arg in args[::-1]:
+            output.atend(op.calculate_rpn(arg))
+
     # push the stack debut and the call end label
     output.add_push_label(end_label)
 
@@ -317,23 +321,40 @@ def call_func(f: defs.func, tokens: list):
             (0, defs.STACK_DEBUT_PTR))
 
     # push the arguments to the stack
-    for arg in args:
-        output.atend(op.calculate_rpn(arg))
-
-    output.add("mov",
-            (0, defs.STACK_DEBUT_PTR),
-            (0, defs.STACK_PTR))
-
-    if f.argc > 0:
-        output.add("add",
+    if f.is_vaargs:
+        output.add("mov",
                 (0, defs.STACK_DEBUT_PTR),
-                (1, utl.to_u16(f.argc)))
+                (0, defs.STACK_PTR))
+
+        output.add("push",
+                (1, utl.to_u16(len(args))))
+        output.add("push", # TODO check if this is not eq to STACK_DEBUT_PTR
+                (0, defs.STACK_PTR))
+        output.add("add",
+                (2, 0), (1, 3))
+    else:
+        for arg in args:
+            output.atend(op.calculate_rpn(arg))
+
+        output.add("mov",
+                (0, defs.STACK_DEBUT_PTR),
+                (0, defs.STACK_PTR))
+
+        if f.argc > 0:
+            output.add("add",
+                    (0, defs.STACK_DEBUT_PTR),
+                    (1, utl.to_u16(f.argc)))
 
     output.add_goto(f"func_{f.name}", (1, 0)) # unconditional jump to the function's code
 
     output.add_label(end_label)
 
-    output.add("pop",
-            (1, 0)) # pop the call end label from the stack
+    if f.is_vaargs:
+        output.add("add",
+                (0, defs.STACK_PTR),
+                (1, utl.to_u16(len(args) + 1))) # pop the arguments
+    else:
+        output.add("pop",
+                (1, 0)) # pop the call end label from the stack
 
     return output

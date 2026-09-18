@@ -178,10 +178,10 @@ def compile_line(lines: list, current_line: int, labels: tuple = None):
                 tmp = toks.locate_braces(lines, closing_line + 1)
                 inner_output = compile_lines(lines[closing_line + 3:tmp], tmp - closing_line - 3, labels)
                 closing_line = tmp
-                
+
                 output.atend(inner_output)
                 break
-    
+
             # elif block
 
             if len(next_tokens) < 2:
@@ -203,7 +203,7 @@ def compile_line(lines: list, current_line: int, labels: tuple = None):
                 next_label = utl.get_new_label()
             else:
                 next_label = fin_label
-    
+
             # add a jump instruction to skip the elif block if the condition is false
             output.add_goto(
                 next_label,
@@ -249,7 +249,7 @@ def compile_line(lines: list, current_line: int, labels: tuple = None):
         output.add_label(fin_label)
 
         return (output, closing_line - current_line + 1) # return the number of lines to skip
-    
+
     elif tokens[0] == "for":
         # Syntax: for var (debut, fin)
         # debut and fin can be any expression that evaluates to an integer
@@ -280,7 +280,7 @@ def compile_line(lines: list, current_line: int, labels: tuple = None):
             # move the result from the stack to the variable's memory location
             output.add("pop",
                     (3, utl.to_u16(-v.offset)))
-            
+
         debut_label = utl.get_new_label()
         next_label  = utl.get_new_label()
         fin_label   = utl.get_new_label()
@@ -290,7 +290,7 @@ def compile_line(lines: list, current_line: int, labels: tuple = None):
             output.atend(op.calculate_rpn(args[1]))
 
         output.add_label(debut_label)
-        
+
         if len(args) == 2:
             # compare the loop variable with the fin value
             output.add("push",
@@ -299,7 +299,7 @@ def compile_line(lines: list, current_line: int, labels: tuple = None):
                     (2, 0), (2, 1))
             output.add("pop",
                     (0, defs.COND_RES_ADDR))
-            
+
             output.add_goto(
                 fin_label, (0, defs.COND_RES_ADDR)) # jump if the condition is false
 
@@ -318,10 +318,10 @@ def compile_line(lines: list, current_line: int, labels: tuple = None):
                 (2, 0), (1, 1))
         output.add("pop",
                 (3, utl.to_u16(-v.offset)))
-        
+
         output.add_goto(
             debut_label, (1, 0)) # unconditional jump to the beginning of the for loop
-        
+
         output.add_label(fin_label)
 
         if len(args) == 2:
@@ -329,12 +329,12 @@ def compile_line(lines: list, current_line: int, labels: tuple = None):
 
         return (output, closing_line - current_line + 1) # return the number of lines to skip
 
-    elif tokens[0] == "func":
+    elif tokens[0] in ("func", "vafunc"):
         if defs.CURRENT_SCOPE != "global":
             utl.say_error(f"Function declaration not allowed in non-global scope")
 
         if len(tokens) < 4 or tokens[2] != '(' or tokens[-1] != ')':
-            utl.say_error(f"Bad syntax\nSyntax example: func func_name(arg1, arg2)")
+            utl.say_error(f"Bad syntax\nSyntax example: {tokens[0]} func_name(arg1, arg2)")
 
         if not defs.is_valid_name(tokens[1]):
             utl.say_error(f"Invalid function name: {tokens[1]}")
@@ -344,14 +344,17 @@ def compile_line(lines: list, current_line: int, labels: tuple = None):
 
         args = toks.split_func_args(tokens[3:-1])
         new_scope = f"func_{tokens[1]}"
-    
+
         for i, e in enumerate(args):
             if len(e) != 1:
-                utl.say_error(f"Bad syntax in arguments\nSyntax example: func func_name(arg1, arg2)")
+                utl.say_error(f"Bad syntax in arguments\nSyntax example: {tokens[0]} func_name(arg1, arg2)")
             if not defs.is_valid_name(e[0]):
                 utl.say_error(f"Invalid argument name: {e[0]}")
             defs.variable(e[0], 0, i + 1, scope = new_scope).add()
-        
+
+        if tokens[0] == "vafunc" and len(args) != 2:
+            utl.say_error("Variable argument function must have 2 arguments (arg count and arg pointer)\nSyntax example: vafunc func_name(argc, argp)")
+
         # compile the lines inside the function block
         closing_line = toks.locate_braces(lines, current_line)
         func_lines = lines[current_line + 2:closing_line]
@@ -360,7 +363,7 @@ def compile_line(lines: list, current_line: int, labels: tuple = None):
         if func_lines[-1][1][0] != "return":
             func_lines.append((func_lines[-1][0], ["return"]))
 
-        f = defs.func(tokens[1], len(args))
+        f = defs.func(tokens[1], len(args), is_vaargs = (tokens[0] == "vafunc"))
         f.add()
 
         inner_output = out.output_code()
@@ -368,6 +371,34 @@ def compile_line(lines: list, current_line: int, labels: tuple = None):
         inner_output.atend(compile_lines(func_lines, len(func_lines), new_scope = new_scope))
 
         f.opcodes = inner_output
+
+        return (output, closing_line - current_line + 1) # return the number of lines to skip
+
+    elif tokens[0] == "sub":
+        if len(tokens) != 1:
+            utl.say_error("Nothing expected after sub keyword\nSyntax example: sub { ... }")
+
+        # compile the lines inside the sub block
+        closing_line = toks.locate_braces(lines, current_line)
+
+        # backup the current stack debut
+        output.add("push",
+                (0, defs.STACK_DEBUT_PTR))
+
+        # setup a new stack debut
+        output.add("mov",
+                (0, defs.STACK_DEBUT_PTR),
+                (0, defs.STACK_PTR))
+
+        output.atend(compile_lines(lines[current_line + 2:closing_line], closing_line - current_line - 2, labels))
+
+        # go to the beginning of the substack
+        output.add("mov",
+                (0, defs.STACK_PTR), (0, defs.STACK_DEBUT_PTR))
+
+        # restore stack debut value
+        output.add("pop",
+                (0, defs.STACK_DEBUT_PTR))
 
         return (output, closing_line - current_line + 1) # return the number of lines to skip
 
@@ -399,8 +430,9 @@ def compile_line(lines: list, current_line: int, labels: tuple = None):
         else:
             # set return value to 0
             output.add("mov",
-                    (0, defs.FUNC_RET_ADDR), (1, 0)) 
+                    (0, defs.FUNC_RET_ADDR), (1, 0))
 
+        # go to the beginning of the substack
         output.add("mov",
             (0, defs.STACK_PTR), (0, defs.STACK_DEBUT_PTR))
 

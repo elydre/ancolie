@@ -39,6 +39,26 @@ func putchar(c) {
     screen_x = screen_x 1 +
 }
 
+func putnbr(n) {
+    if n 9 > {
+        putnbr(n 10 /)
+    }
+
+    putchar(n 10 % '0' +)
+}
+
+func puthex(n) {
+    : base
+
+    base = "0123456789ABCDEF"
+
+    if n 15 > {
+        puthex(n 16 /)
+    }
+
+    putchar([base n 16 % +])
+}
+
 func print(str) {
     : i c
 
@@ -53,10 +73,45 @@ func print(str) {
     screen_flush()
 }
 
-func putnbr(n) {
-    if n 9 > {
-        putnbr(n 10 /)
-    }
+vafunc printf(argc, argp) {
+    : i c str
 
-    putchar(n 10 % '0' +)
+    str = [argp]
+
+    for i (0) {
+        c = [str i +]
+        if c 0 == {
+            break
+        }
+        if c '%' == {
+            i = i 1 +
+            c = [str i +]
+            if c '%' == {
+                putchar('%')
+                continue
+            }
+            argp = argp 1 +
+            argc = argc 1 -
+            if argc 0 == {
+                print("\n[printf not enough arguments]\n")
+                return
+            }
+            if c 'd' == {
+                putnbr([argp])
+            }
+            elif c 'x' == {
+                putchar('0')
+                putchar('x')
+                puthex([argp])
+            }
+            elif c 's' == {
+                print([argp])
+            }
+            elif c 'c' == {
+                putchar([argp])
+            }
+            continue
+        }
+        putchar(c)
+    }
 }

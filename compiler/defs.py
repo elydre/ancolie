@@ -36,11 +36,12 @@ class variable:
             LOCAL_VARS[self.scope].append(self)
 
 class func:
-    def __init__(self, name, argc, does_return = True, is_builtin = False, blt_handler = None, no_rpn = False, opcodes = None):
+    def __init__(self, name, argc, is_vaargs = False, does_return = True, is_builtin = False, blt_handler = None, no_rpn = False, opcodes = None):
         self.name = name
         self.argc = argc
         self.does_return = does_return
         self.is_builtin = is_builtin
+        self.is_vaargs = is_vaargs
 
         self.blt_handler = blt_handler  # function to call if builtin
         self.no_rpn = no_rpn            # illegal use in RPN (alloca)
@@ -142,7 +143,7 @@ CHARS_SPE = [",", "(", ")", ":", "=", "{", "}", "[", "]", "&", "$", "!", "//", "
 CHARS_OPR = ["+", "-", "*", "/", "%", "==", "!=", "<", ">", "&&", "|"]
 CHARS_SPE += CHARS_OPR
 
-KEYWORDS = ["if", "elif", "else", "while", "func", "return", "break", "continue", "for"]
+KEYWORDS = ["if", "elif", "else", "while", "func", "vafunc", "return", "break", "continue", "for", "sub"]
 
 NEW_VAR = ":"
 NEW_VAR_STATIC = "$"

@@ -24,28 +24,22 @@ func shell_echo(argc, argv) {
 
     for i (1, argc) {
         print([argv i +])
-        print(" ")
+        putchar(' ')
     }
-    print("\n")
+    putchar('\n')
 }
 
 func shell_sp(argc, argv) {
     : sp
     sp = _get_sp()
-    print("Stack pointer: ")
-    putnbr(sp)
-    print("\n")
+    printf("Stack pointer: %x\n", sp)
 }
 
 func shell_time(argc, argv) {
     : t
     t = in(0x1030)
 
-    print("it is ")
-    putnbr(t 1000 / 6 +)
-    print(":")
-    putnbr(t 1000 % 50 * 833 /)
-    print("\n")
+    printf("it is %d:%d\n", t 1000 / 6 +, t 1000 % 50 * 833 /)
 }
 
 func interpret(buffer) {
@@ -76,9 +70,8 @@ func interpret(buffer) {
     } elif streq([args], "time") {
         shell_time(arg_count, args)
     } else {
-        print("unknown command: ")
-        print([args])
-        print("\ntype 'help' for a list of available commands\n")
+        printf("unknown command: %s\n", [args])
+        print("type 'help' for a list of available commands\n")
     }
 }
 

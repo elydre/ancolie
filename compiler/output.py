@@ -245,7 +245,7 @@ class output_code:
                     utl.say_error(f"(Internal) Unknown label: {instr.goto_label}")
                 # replace the goto instruction with a jmp instruction
                 instr.setopcode("jmp", (1, resolved_address), instr.goto_val, None, None)
-            
+
             elif instr.type == self.instruction.TYPE_PUSH_LABEL:
                 resolved_address = label_addresses.get(instr.goto_label)
                 if resolved_address is None:

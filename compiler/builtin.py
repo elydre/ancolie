@@ -11,12 +11,12 @@ def blt_alloca(args: list):
     output.add("sub",
             (0, defs.STACK_PTR),
             (2, 0))
-    
+
     # pop calculated size from the stack
     # (this is not the right address, but we just have to remove 1 value from the stack)
     output.add("pop",
             (1, 0))
-    
+
     # copy the current stack pointer value to return memory location
     output.add("mov",
             (0, defs.FUNC_RET_ADDR),

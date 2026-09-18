@@ -73,7 +73,7 @@ def is_string(s):
         return False
     return True
 
-def convert_string(s):            
+def convert_string(s):
     # returns a list of numbers representing the string, with a null terminator at the end
 
     result = []

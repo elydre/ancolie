@@ -85,7 +85,7 @@ def tokenize_lines(lines: str):
         line = line.strip()
         for t in tokenize_line(line):
             tokens_lines.append((lno, t))
-    
+
     return tokens_lines
 
 def locate_braces(lines: list, current_line: int):
