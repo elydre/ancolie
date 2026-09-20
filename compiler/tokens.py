@@ -88,7 +88,7 @@ def tokenize_lines(lines: str):
 
     return tokens_lines
 
-def locate_braces(lines: list, current_line: int):
+def locate_braces(lines: list, current_line: int = 0):
      # find the opening brace '{'
     if current_line + 1 >= len(lines) or lines[current_line + 1][1] != ['{']:
         utl.say_error("Bad syntax\nExpected '{' after 'if' statement")

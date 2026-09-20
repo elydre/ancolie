@@ -8,16 +8,25 @@ class opcode:
 
 
 class variable:
-    def __init__(self, name, ptrlvl, offset_or_addr, scope = None, is_static = False):
+    def __init__(self, name, ptrlvl, offset_or_addr = -1, scope = None, is_static = False, is_func_arg = False):
         self.name = name
         self.ptrlvl = ptrlvl # number of [] at declaration (actually unused)
         self.is_static = is_static
+        self.is_func_arg = is_func_arg
 
         if scope is None:
             scope = CURRENT_SCOPE
 
+        if offset_or_addr == -1:
+            if is_static:
+                utl.say_error(f"(Internal) Static variable {name} must have an address")
+            if scope in LOCAL_VARS.keys() and LOCAL_VARS[scope]:
+                offset_or_addr = LOCAL_VARS[scope][-1].offset + 1
+            else:
+                offset_or_addr = 1
+
         self.scope = scope
-    
+
         if is_static:
             self.addr = offset_or_addr
             self.offset = None
@@ -36,7 +45,7 @@ class variable:
             LOCAL_VARS[self.scope].append(self)
 
 class func:
-    def __init__(self, name, argc, is_vaargs = False, does_return = True, is_builtin = False, blt_handler = None, no_rpn = False, opcodes = None):
+    def __init__(self, name, argc, does_return = True, is_builtin = False, blt_handler = None, no_rpn = False, is_vaargs = False, opcodes = None):
         self.name = name
         self.argc = argc
         self.does_return = does_return
@@ -73,7 +82,7 @@ def get_variable(s, scope = None):
         return next(e for e in LOCAL_VARS[scope] if e.name == s)
     if "global" in STATIC_VARS.keys() and s in [e.name for e in STATIC_VARS["global"]]:
         return next(e for e in STATIC_VARS["global"] if e.name == s)
-    
+
     utl.say_error(f"Unknown variable: {s}")
 
 
@@ -137,7 +146,7 @@ OPCODES = [
     opcode("pushs",  0x17, 2),
     opcode("pops",   0x18, 2),
     opcode("memset", 0x19, 3),
-    opcode("memmov", 0x1A, 3),    
+    opcode("memmov", 0x1A, 3),
     opcode("hlt",    0xFF, 0),
 ]
 

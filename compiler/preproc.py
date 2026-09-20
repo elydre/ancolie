@@ -5,7 +5,6 @@ import os
 
 def include(tokens_lines, file_path):
     # support #include "file.cream"
-    # support #include <file.cream>
 
     new_tokens_lines = []
 

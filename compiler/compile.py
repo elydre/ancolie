@@ -78,39 +78,45 @@ def compile_assembly(lines):
     return output
 
 
-def compile_lines(lines: list, size: int, labels: tuple = None, new_scope: str = None):
+def compile_lines(lines: list, labels: tuple = None, tree: list = [], new_scope: str = None):
     output = out.output_code()
 
     if new_scope is not None:
         old_scope = defs.CURRENT_SCOPE
-        output.add_comment(f"\n--- begin of {new_scope} ---")
         defs.CURRENT_SCOPE = new_scope
         if new_scope not in defs.LOCAL_VARS:
             defs.LOCAL_VARS[new_scope] = []
 
     current_line = 0
+    size = len(lines)
 
     while current_line < size:
-        sub_output, to_skip = compile_line(lines, current_line, labels)
+        sub_output, to_skip = compile_line(lines[current_line:], labels, tree)
         output.atend(sub_output)
         current_line += to_skip
 
     if new_scope is not None:
+        variable_decl = out.output_code()
+        variable_decl.add_comment(f"\n--- begin of {new_scope} ---")
+        for v in defs.LOCAL_VARS[new_scope]:
+            if v.is_static or v.is_func_arg:
+                continue
+            variable_decl.add("push", (1, 0))
+        output.atdebut(variable_decl)
         defs.CURRENT_SCOPE = old_scope
 
     return output
 
 
-def compile_line(lines: list, current_line: int, labels: tuple = None):
-    defs.CURRENT_LNO, tokens = lines[current_line]
+def compile_line(lines: list, labels: tuple, tree: list):
+    defs.CURRENT_LNO, tokens = lines[0]
 
     output = out.output_code()
     output.add_comment(f"\nl{defs.CURRENT_LNO:03}  {' '.join(tokens)}")
 
-    if tokens[0] in (defs.NEW_VAR, defs.NEW_VAR_STATIC):
-        if current_line > 0 and lines[current_line - 1][1][0] not in (defs.NEW_VAR, defs.NEW_VAR_STATIC):
-            utl.say_error(f"Variable declarations must be at the beginning of a scope")
+    new_tree = tree + [tokens[0]]
 
+    if tokens[0] in (defs.NEW_VAR, defs.NEW_VAR_STATIC):
         def_char = tokens[0]
         tokens = tokens[1:]
 
@@ -140,10 +146,8 @@ def compile_line(lines: list, current_line: int, labels: tuple = None):
                 utl.say_error(f"Invalid variable name: {tokens[ptrlvl]}")
 
             if def_char == defs.NEW_VAR:
-                old_offset = defs.LOCAL_VARS[defs.CURRENT_SCOPE][-1].offset if defs.LOCAL_VARS[defs.CURRENT_SCOPE] else 0
-                defs.variable(var_name, ptrlvl, old_offset + 1).add()
-
-                output.add("push", (1, 0))
+                defs.variable(var_name, ptrlvl).add()
+                # variable will be automaticly added to stack by compile_lines
 
             else:
                 if len(tokens) > end_brackets:
@@ -216,11 +220,11 @@ def compile_line(lines: list, current_line: int, labels: tuple = None):
 
         # pop the result from the stack to the conditional result memory location
         output.add("pop",
-            (0, defs.COND_RES_ADDR))
+                (0, defs.COND_RES_ADDR))
 
         # compile the lines inside the if block
-        closing_line = toks.locate_braces(lines, current_line)
-        inner_output = compile_lines(lines[current_line + 2:closing_line], closing_line - current_line - 2, labels)
+        closing_line = toks.locate_braces(lines)
+        inner_output = compile_lines(lines[2:closing_line], labels, new_tree)
 
         fin_label = utl.get_new_label()
         next_label = utl.get_new_label()
@@ -247,7 +251,7 @@ def compile_line(lines: list, current_line: int, labels: tuple = None):
                     utl.say_error(f"Unexpected token {next_tokens[1]} after else\nSyntax example: else " + "{ ... }")
                 # compile the lines inside the else block
                 tmp = toks.locate_braces(lines, closing_line + 1)
-                inner_output = compile_lines(lines[closing_line + 3:tmp], tmp - closing_line - 3, labels)
+                inner_output = compile_lines(lines[closing_line + 3:tmp], labels, tree + ["else"])
                 closing_line = tmp
 
                 output.atend(inner_output)
@@ -267,7 +271,7 @@ def compile_line(lines: list, current_line: int, labels: tuple = None):
 
             # compile the lines inside the elif block
             tmp = toks.locate_braces(lines, closing_line + 1)
-            inner_output = compile_lines(lines[closing_line + 3:tmp], tmp - closing_line - 3, labels)
+            inner_output = compile_lines(lines[closing_line + 3:tmp], labels, tree + ["elif"])
             closing_line = tmp
 
             if closing_line + 1 < len(lines) and lines[closing_line + 1][1][0] in ("elif", "else"):
@@ -277,8 +281,8 @@ def compile_line(lines: list, current_line: int, labels: tuple = None):
 
             # add a jump instruction to skip the elif block if the condition is false
             output.add_goto(
-                next_label,
-                (0, defs.COND_RES_ADDR)) # jump if the condition is false
+                    next_label,
+                    (0, defs.COND_RES_ADDR)) # jump if the condition is false
 
             output.atend(inner_output)
 
@@ -288,7 +292,7 @@ def compile_line(lines: list, current_line: int, labels: tuple = None):
         else:
             output.add_label(fin_label)
 
-        return (output, closing_line - current_line + 1) # return the number of lines to skip
+        return (output, closing_line + 1) # return the number of lines to skip
 
     elif tokens[0] == "while":
         if len(tokens) < 2:
@@ -303,23 +307,22 @@ def compile_line(lines: list, current_line: int, labels: tuple = None):
 
         # pop the result from the stack to the conditional result memory location
         output.add("pop",
-            (0, defs.COND_RES_ADDR))
+                (0, defs.COND_RES_ADDR))
 
         # compile the lines inside the while block
-        closing_line = toks.locate_braces(lines, current_line)
-        inner_output = compile_lines(lines[current_line + 2:closing_line], closing_line - current_line - 2, (debut_label, fin_label))
+        closing_line = toks.locate_braces(lines)
+        inner_output = compile_lines(lines[2:closing_line], (debut_label, fin_label), new_tree)
 
         inner_output.add_goto(
-            debut_label, (1, 0)) # unconditional jump to the beginning of the while loop
-
+                debut_label, (1, 0)) # unconditional jump to the beginning of the while loop
 
         output.add_goto(
-            fin_label, (0, defs.COND_RES_ADDR)) # jump if the condition is false
+                fin_label, (0, defs.COND_RES_ADDR)) # jump if the condition is false
 
         output.atend(inner_output)
         output.add_label(fin_label)
 
-        return (output, closing_line - current_line + 1) # return the number of lines to skip
+        return (output, closing_line + 1) # return the number of lines to skip
 
     elif tokens[0] == "for":
         # Syntax: for var (debut, fin)
@@ -372,12 +375,12 @@ def compile_line(lines: list, current_line: int, labels: tuple = None):
                     (0, defs.COND_RES_ADDR))
 
             output.add_goto(
-                fin_label, (0, defs.COND_RES_ADDR)) # jump if the condition is false
+                    fin_label, (0, defs.COND_RES_ADDR)) # jump if the condition is false
 
 
         # compile the lines inside the for block
-        closing_line = toks.locate_braces(lines, current_line)
-        inner_output = compile_lines(lines[current_line + 2:closing_line], closing_line - current_line - 2, (next_label, fin_label))
+        closing_line = toks.locate_braces(lines)
+        inner_output = compile_lines(lines[2:closing_line], (next_label, fin_label), new_tree)
 
         output.atend(inner_output)
         output.add_comment(f"\nIncrement the loop variable {v.name}")
@@ -391,18 +394,18 @@ def compile_line(lines: list, current_line: int, labels: tuple = None):
                 (3, utl.to_u16(-v.offset)))
 
         output.add_goto(
-            debut_label, (1, 0)) # unconditional jump to the beginning of the for loop
+                debut_label, (1, 0)) # unconditional jump to the beginning of the for loop
 
         output.add_label(fin_label)
 
         if len(args) == 2:
             output.add("pop", (1, 0)) # pop the fin value from the stack
 
-        return (output, closing_line - current_line + 1) # return the number of lines to skip
+        return (output, closing_line + 1) # return the number of lines to skip
 
     elif tokens[0] in ("func", "vafunc"):
-        if defs.CURRENT_SCOPE != "global":
-            utl.say_error(f"Function declaration not allowed in non-global scope")
+        if tree != []:
+            utl.say_error("Function declaration not allowed inside a block")
 
         if len(tokens) < 4 or tokens[2] != '(' or tokens[-1] != ')':
             utl.say_error(f"Bad syntax\nSyntax example: {tokens[0]} func_name(arg1, arg2)")
@@ -421,14 +424,14 @@ def compile_line(lines: list, current_line: int, labels: tuple = None):
                 utl.say_error(f"Bad syntax in arguments\nSyntax example: {tokens[0]} func_name(arg1, arg2)")
             if not defs.is_valid_name(e[0]):
                 utl.say_error(f"Invalid argument name: {e[0]}")
-            defs.variable(e[0], 0, i + 1, scope = new_scope).add()
+            defs.variable(e[0], 0, i + 1, is_func_arg = True, scope = new_scope).add()
 
         if tokens[0] == "vafunc" and len(args) != 2:
             utl.say_error("Variable argument function must have 2 arguments (arg count and arg pointer)\nSyntax example: vafunc func_name(argc, argp)")
 
         # compile the lines inside the function block
-        closing_line = toks.locate_braces(lines, current_line)
-        func_lines = lines[current_line + 2:closing_line]
+        closing_line = toks.locate_braces(lines)
+        func_lines = lines[2:closing_line]
 
         # check if the function has a return statement, if not add a return at the end
         if func_lines[-1][1][0] != "return":
@@ -439,50 +442,48 @@ def compile_line(lines: list, current_line: int, labels: tuple = None):
 
         inner_output = out.output_code()
         inner_output.add_label(new_scope)
-        inner_output.atend(compile_lines(func_lines, len(func_lines), new_scope = new_scope))
+        inner_output.atend(compile_lines(func_lines, new_scope = new_scope, tree = new_tree))
 
         f.opcodes = inner_output
 
-        return (output, closing_line - current_line + 1) # return the number of lines to skip
+        return (output, closing_line + 1) # return the number of lines to skip
 
     elif tokens[0] == "sub":
         if len(tokens) != 1:
             utl.say_error("Nothing expected after sub keyword\nSyntax example: sub { ... }")
 
         # compile the lines inside the sub block
-        closing_line = toks.locate_braces(lines, current_line)
+        closing_line = toks.locate_braces(lines)
 
-        # backup the current stack debut
-        output.add("push",
-                (0, defs.STACK_DEBUT_PTR))
+        sub_count = tree.count("sub") + 1
+        var_name = f"sub{sub_count}"
 
-        # setup a new stack debut
+        if not defs.is_variable(var_name):
+            defs.variable(var_name, 0).add()
+        var_offset = defs.get_variable(var_name).offset
+
+        # backup the stack pointer to the variable
         output.add("mov",
-                (0, defs.STACK_DEBUT_PTR),
-                (0, defs.STACK_PTR))
+                   (3, utl.to_u16(-var_offset)), (0, defs.STACK_PTR))
 
-        output.atend(compile_lines(lines[current_line + 2:closing_line], closing_line - current_line - 2, labels))
+        output.atend(compile_lines(lines[2:closing_line], labels, new_tree))
 
-        # go to the beginning of the substack
+        # restore the stack pointer from the variable
         output.add("mov",
-                (0, defs.STACK_PTR), (0, defs.STACK_DEBUT_PTR))
+                   (0, defs.STACK_PTR), (3, utl.to_u16(-var_offset)))
 
-        # restore stack debut value
-        output.add("pop",
-                (0, defs.STACK_DEBUT_PTR))
-
-        return (output, closing_line - current_line + 1) # return the number of lines to skip
+        return (output, closing_line + 1) # return the number of lines to skip
 
     elif tokens[0] == "asm":
         if len(tokens) != 1:
             utl.say_error("Nothing expected after asm keyword\nSyntax example: asm { ... }")
 
         # compile the lines inside the sub block
-        closing_line = toks.locate_braces(lines, current_line)
+        closing_line = toks.locate_braces(lines)
 
-        output.atend(compile_assembly(lines[current_line + 2:closing_line]))
+        output.atend(compile_assembly(lines[2:closing_line]))
 
-        return (output, closing_line - current_line + 1) # return the number of lines to skip
+        return (output, closing_line + 1) # return the number of lines to skip
 
 
     elif tokens[0] == "break":
@@ -517,7 +518,7 @@ def compile_line(lines: list, current_line: int, labels: tuple = None):
 
         # go to the beginning of the substack
         output.add("mov",
-            (0, defs.STACK_PTR), (0, defs.STACK_DEBUT_PTR))
+                (0, defs.STACK_PTR), (0, defs.STACK_DEBUT_PTR))
 
         # restore stack debut and pc values
         output.add("pop",
@@ -542,7 +543,7 @@ def compile(lines: str, path: str = None):
     tokens_lines = preproc.preprocess(tokens_lines, path if path else "")
 
     output = out.output_code()
-    output.atend(compile_lines(tokens_lines, len(tokens_lines), new_scope="global"))
+    output.atend(compile_lines(tokens_lines, new_scope="global"))
     output.atend(op.fini())
 
     for f in defs.ALL_FUNCS:

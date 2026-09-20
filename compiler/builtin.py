@@ -24,6 +24,18 @@ def blt_alloca(args: list):
 
     return output
 
+def blt_array(args: list):
+    output = out.output_code()
+
+    # push all arguments to the stack
+    for arg in args[::-1]:
+        output.atend(op.calculate_rpn(arg))
+
+    output.add("mov",
+            (0, defs.FUNC_RET_ADDR),
+            (0, defs.STACK_PTR))
+
+    return output
 
 def blt_out(args: list):
     output = out.output_code()
@@ -117,6 +129,7 @@ def blt_get_screen(args: list):
 
 def add_builtin_functions():
     defs.func("alloca",      1, True,  is_builtin=True, blt_handler = blt_alloca, no_rpn=True).add()
+    defs.func("array",       0, True,  is_builtin=True, blt_handler = blt_array, no_rpn=True, is_vaargs=True).add()
     defs.func("out",         2, False, is_builtin=True, blt_handler = blt_out).add()
     defs.func("in",          1, True,  is_builtin=True, blt_handler = blt_in).add()
     defs.func("dump",        1, False, is_builtin=True, blt_handler = blt_dump).add()
