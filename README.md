@@ -92,6 +92,64 @@ var = [str 1 +]   // assignment from string pointer + 1 (next character)
 */
 ptr = alloca(10)  // allocate 10 bytes on the stack
 [ptr] = 3         // assign 3 to the first byte of the allocation
+
+/* Usual control keywords (if, elif, else, while) are available.
+** They expect RPN expressions, parentheses around
+** the expressions are tolerated.
+*/
+while var 0 != {
+    if var 1 == {
+        continue
+    } elif var 2 == {
+        break
+    } else {
+        // do something else
+    }
+}
+
+/* For loops are also available with the following syntax:
+** `for var (debut_value, end_value) { ... }`
+*/
+for i (0, 10) {
+    // i will take values from 0 to 9
+}
+
+/* Functions are declared with the `func` keyword.
+** They can have arguments and return values.
+*/
+func add(a, b) {        // classic function declaration
+    return a b +        // return the sum of a and b
+}
+
+vafunc sum(argc, argp) {    // variable arguments function
+    // `argc` is the number of arguments
+    // `argp` is a pointer to the first argument
+    : s
+    for i (0, argc) {
+        s = [argp i +] s +  // sum all arguments
+    }
+    return s
+}
+
+: res
+res = add(3, 4)             // res will be 7
+res = sum(3, 1, 2, 3)       // res will be 9
+
+/* Assembly integration is possible with the `asm` keyword.
+** The assembly code can use ancolie variables.
+*/
+: out
+asm {
+    push 0              // grow the stack for calculation
+
+    loop:
+        add &out, 1     // increment the value of `out`
+        mov [sp], &out  // copy `out` to the stack
+        gt [sp], 10     // compare the value of `out` with 10
+        jmp loop, [sp]  // if `out` is less than 10, jump to loop
+    
+    pop 0               // restore the stack
+}
 ```
 
 ## Computer architecture
