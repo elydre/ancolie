@@ -8,8 +8,8 @@ import compiler.defs as defs
 import argparse
 
 
-parser = argparse.ArgumentParser(description="Cream Compiler")
-# input_file expected to be a .li file
+parser = argparse.ArgumentParser(description="Ancolie Compiler")
+
 parser.add_argument("input_file",           help="Input file to compile",  type=str)
 parser.add_argument("-a", "--dump-asm",     help="Dump assembly code to stdout", action="store_true", dest="dump_asm")
 parser.add_argument("-o", "--output",       help="Output file name",       default="output.bin", dest="output_file")
