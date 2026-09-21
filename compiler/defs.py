@@ -159,7 +159,7 @@ CHARS_SPE = [",", "(", ")", ":", "=", "{", "}", "[", "]", "&", "$", "!", "//", "
 CHARS_OPR = ["+", "-", "*", "/", "%", "==", "!=", "<", ">", "&&", "|"]
 CHARS_SPE += CHARS_OPR
 
-KEYWORDS = ["if", "elif", "else", "while", "func", "vafunc", "return", "break", "continue", "for", "sub"]
+KEYWORDS = ["if", "elif", "else", "while", "func", "vafunc", "return", "break", "continue", "for", "sub", "asm"]
 
 NEW_VAR = ":"
 NEW_VAR_STATIC = "$"
