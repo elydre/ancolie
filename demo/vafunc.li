@@ -1,0 +1,9 @@
+vafunc test(argc, argp) {
+    :i
+    dump(argc)
+    for i (0, argc) {
+        dump([argp i +])
+    }
+}
+
+test(1, 2, 3, 4, 5)
