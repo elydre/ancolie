@@ -133,7 +133,7 @@ vafunc sum(argc, argp) {    // variable arguments function
 
 : res
 res = add(3, 4)             // res will be 7
-res = sum(3, 1, 2, 3)       // res will be 9
+res = sum(1, 2, 3, 4, 5)    // res will be 15
 
 /* Assembly integration is possible with the `asm` keyword.
 ** The assembly code can use ancolie variables.
@@ -182,26 +182,28 @@ opcode (8 bit)  sources (4 * 2bit)  [  arg0 (16 bit)   ] ... [ arg3 (16 bit)    
 | `0x0A` |  neq   | `a` `b`     | `a <- a != b`              |
 | `0x0B` |  lt    | `a` `b`     | `a <- a < b`               |
 | `0x0C` |  gt    | `a` `b`     | `a <- a > b`               |
+| `0x0D` |  lte   | `a` `b`     | `a <- a <= b`              |
+| `0x0E` |  gte   | `a` `b`     | `a <- a >= b`              |
 |        |        |             |                            |
-| `0x0D` |  and   | `a` `b`     | `a <- a && b`              |
-| `0x0E` |  band  | `a` `b`     | `a <- a & b`               |
-| `0x0F` |  bor   | `a` `b`     | `a <- a bor b` (md sorry)  |
+| `0x0F` |  and   | `a` `b`     | `a <- a && b`              |
+| `0x10` |  band  | `a` `b`     | `a <- a & b`               |
+| `0x11` |  bor   | `a` `b`     | `a <- a bor b` (md sorry)  |
 |        |        |             |                            |
-| `0x10` |  jmp   | `a` `b`     | `pc  = a if b == 0`        |
-| `0x11` |  jmpr  | `a` `b`     | `pc += a if b == 0`        |
+| `0x12` |  jmp   | `a` `b`     | `pc  = a if b == 0`        |
+| `0x13` |  jmpr  | `a` `b`     | `pc += a if b == 0`        |
 |        |        |             |                            |
-| `0x12` |  out   | `port` `a`  | output `a` to `port`       |
-| `0x13` |  in    | `a` `port`  | input from `port` to `a`   |
+| `0x14` |  out   | `port` `a`  | output `a` to `port`       |
+| `0x15` |  in    | `a` `port`  | input from `port` to `a`   |
 |        |        |             |                            |
-| `0x14` |  ssp   | `a`         | `sp <- a`                  |
-| `0x15` |  sup   | `a`         | `up <- a`                  |
+| `0x16` |  ssp   | `a`         | `sp <- a`                  |
+| `0x17` |  sup   | `a`         | `up <- a`                  |
 |        |        |             |                            |
-| `0x16` |  mss   | `A` `a` `B` `b` | `[A + a] <- [B + b]`   |
-| `0x17` |  pushs | `A` `a`     | `sp--`, `[sp] <- [A + a]`  |
-| `0x18` |  pops  | `A` `a`     | `[A + a] <- [sp]`, `sp++`  |
+| `0x18` |  mss   | `A` `a` `B` `b` | `[A + a] <- [B + b]`   |
+| `0x19` |  pushs | `A` `a`     | `sp--`, `[sp] <- [A + a]`  |
+| `0x1A` |  pops  | `A` `a`     | `[A + a] <- [sp]`, `sp++`  |
 |        |        |             |                            |
-| `0x19` | memset | `a` `b` `c` | `memset(addr=a val=b s=c)` |
-| `0x1A` | memmov | `a` `b` `c` | `memmov(dest=a src=b s=c)` |
+| `0x1B` | memset | `a` `b` `c` | `memset(addr=a val=b s=c)` |
+| `0x1C` | memmov | `a` `b` `c` | `memmov(dest=a src=b s=c)` |
 |        |        |             |                            |
 | `0xFF` |  hlt   |             | halt the computer          |
 

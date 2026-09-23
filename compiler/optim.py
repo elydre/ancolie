@@ -110,6 +110,7 @@ class opti_pattern:
 
         return output.instructions
 
+ops = "sub|add|mul|div|mod|eq|neq|lt|gt|lte|gte|and|band|bor"
 
 patterns = [
     opti_pattern(
@@ -126,7 +127,7 @@ patterns = [
         "a = a # n",
         [
             ("push", "$1"),
-            ("#1:sub|add|mul|div|mod|eq|neq|lt|gt|and|band|bor", (2, 0), "$2"),
+            (f"#1:{ops}", (2, 0), "$2"),
             ("pop", "$$1")
         ],
         [
@@ -138,7 +139,7 @@ patterns = [
         [
             ("push", "$1"),
             ("push", "$2"),
-            ("#1:sub|add|mul|div|mod|eq|neq|lt|gt|and|band|bor", (2, 1), (2, 0)),
+            (f"#1:{ops}", (2, 1), (2, 0)),
             ("pop", (1, 0)),
             ("pop", "$$1")
         ],
@@ -150,7 +151,7 @@ patterns = [
         "a = n # p",
         [
             ("push", "$2"),
-            ("#1:sub|add|mul|div|mod|eq|neq|lt|gt|and|band|bor", (2, 0), (2, 1)),
+            (f"#1:{ops}", (2, 0), (2, 1)),
             ("pop", "$1")
         ],
         [
@@ -162,7 +163,7 @@ patterns = [
         "a = b # n",
         [
             ("push", "$2"),
-            ("#1:sub|add|mul|div|mod|eq|neq|lt|gt|and|band|bor", (2, 0), "$3"),
+            (f"#1:{ops}", (2, 0), "$3"),
             ("pop", "$1")
         ],
         [
@@ -208,7 +209,7 @@ patterns = [
         "? # a",
         [
             ("push", "$1"),
-            ("#1:sub|add|mul|div|mod|eq|neq|lt|gt|and|band|bor", (2, 1), (2, 0)),
+            (f"#1:{ops}", (2, 1), (2, 0)),
             ("pop", (1, 0))
         ],
         [

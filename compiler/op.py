@@ -169,6 +169,10 @@ def calculate_rpn(rpn: list):
                 output.add("lt", a, b)
             elif token == '>':
                 output.add("gt", a, b)
+            elif token == '<=':
+                output.add("lte", a, b)
+            elif token == '>=':
+                output.add("gte", a, b)
             elif token == '&&':
                 output.add("and", a, b)
             elif token == '|':

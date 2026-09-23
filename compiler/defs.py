@@ -133,20 +133,22 @@ OPCODES = [
     opcode("neq",    0x0A, 2),
     opcode("lt",     0x0B, 2),
     opcode("gt",     0x0C, 2),
-    opcode("and",    0x0D, 2),
-    opcode("band",   0x0E, 2),
-    opcode("bor",    0x0F, 2),
-    opcode("jmp",    0x10, 2),
-    opcode("jmpr",   0x11, 2),
-    opcode("out",    0x12, 2),
-    opcode("in",     0x13, 2),
-    opcode("ssp",    0x14, 1),
-    opcode("sup",    0x15, 1),
-    opcode("mss",    0x16, 4),
-    opcode("pushs",  0x17, 2),
-    opcode("pops",   0x18, 2),
-    opcode("memset", 0x19, 3),
-    opcode("memmov", 0x1A, 3),
+    opcode("lte",    0x0D, 2),
+    opcode("gte",    0x0E, 2),
+    opcode("and",    0x0F, 2),
+    opcode("band",   0x10, 2),
+    opcode("bor",    0x11, 2),
+    opcode("jmp",    0x12, 2),
+    opcode("jmpr",   0x13, 2),
+    opcode("out",    0x14, 2),
+    opcode("in",     0x15, 2),
+    opcode("ssp",    0x16, 1),
+    opcode("sup",    0x17, 1),
+    opcode("mss",    0x18, 4),
+    opcode("pushs",  0x19, 2),
+    opcode("pops",   0x1A, 2),
+    opcode("memset", 0x1B, 3),
+    opcode("memmov", 0x1C, 3),
     opcode("hlt",    0xFF, 0),
 ]
 
@@ -156,7 +158,7 @@ MAGIC_NUMBER = 0xF057
 ARCH_VERSION = 0x0100
 
 CHARS_SPE = [",", "(", ")", ":", "=", "{", "}", "[", "]", "&", "$", "!", "//", "' '", "#"]
-CHARS_OPR = ["+", "-", "*", "/", "%", "==", "!=", "<", ">", "&&", "|"]
+CHARS_OPR = ["+", "-", "*", "/", "%", "==", "!=", "<", ">", "<=", ">=", "&&", "|"]
 CHARS_SPE += CHARS_OPR
 
 KEYWORDS = ["if", "elif", "else", "while", "func", "vafunc", "return", "break", "continue", "for", "sub", "asm"]
