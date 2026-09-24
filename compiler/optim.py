@@ -7,12 +7,12 @@ def compute_opcodes_pattern(str):
         return (None, [str])
 
     if not ":" in str:
-        utl.say_error(f"(Internal) Invalid pattern optimization string: {str}")
+        utl.say_error(f"Invalid pattern optimization string: {str}", internal=True)
 
     alias, opcodes = str.split(":", 1)
 
     if not alias:
-        utl.say_error(f"(Internal) Invalid pattern optimization string: {str}")
+        utl.say_error(f"Invalid pattern optimization string: {str}", internal=True)
 
     return (alias, opcodes.split("|"))
 
@@ -44,7 +44,7 @@ class opti_pattern:
             alias, opcodes = compute_opcodes_pattern(pline[0])
 
             if alias and alias in matching_opcodes.keys():
-                utl.say_error(f"(Internal) Redefinition of pattern opcode alias: {alias}")
+                utl.say_error(f"Redefinition of pattern opcode alias: {alias}", internal=True)
 
             if not sline[0] in opcodes:
                 return None
@@ -64,17 +64,17 @@ class opti_pattern:
                 if parg.startswith("$$"):
                     parg = parg[1:]
                     if parg not in matching_args.keys():
-                        utl.say_error(f"(Internal) Pattern argument not defined: {parg}")
+                        utl.say_error(f"Pattern argument not defined: {parg}", internal=True)
                     if matching_args[parg] != sarg:
                         return None
 
                 elif parg.startswith("$"):
                     if parg in matching_args.keys():
-                        utl.say_error(f"(Internal) Redefinition of pattern argument: {parg}")
+                        utl.say_error(f"Redefinition of pattern argument: {parg}", internal=True)
                     matching_args[parg] = sarg
 
                 else:
-                    utl.say_error(f"(Internal) Unexpected pattern argument: {parg}")
+                    utl.say_error(f"Unexpected pattern argument: {parg}", internal=True)
 
         # the pattern matches !
         # now we need to generate the replacement instructions
@@ -86,7 +86,7 @@ class opti_pattern:
             opcode = rline[0]
             if opcode.startswith("#"):
                 if opcode not in matching_opcodes.keys():
-                    utl.say_error(f"(Internal) Pattern opcode alias not defined: {opcode}")
+                    utl.say_error(f"Pattern opcode alias not defined: {opcode}", internal=True)
                 opcode = matching_opcodes[opcode]
 
             args = []
@@ -96,7 +96,7 @@ class opti_pattern:
                     continue
                 if rarg.startswith("$"):
                     if rarg not in matching_args.keys():
-                        utl.say_error(f"(Internal) Pattern argument not defined: {rarg}")
+                        utl.say_error(f"Pattern argument not defined: {rarg}", internal=True)
                     args.append(matching_args[rarg])
                 else:
                     args.append(rarg)
@@ -240,6 +240,6 @@ def optimize(code):
         inter += 1
 
     if inter >= max_iter:
-        utl.say_error(f"(Internal) Infinite loop detected in optimization pass")
+        utl.say_error(f"Infinite loop detected in optimization pass", internal=True)
 
     return code

@@ -1,0 +1,28 @@
+struct elm {
+    : [name]
+    : value
+}
+
+:e = alloca(sizeof(elm))
+
+dump(sizeof(elm))
+
+elm[e].name = "item"
+elm[e].value = 1
+
+dump(elm[e].name)
+dump(elm[e].value)
+
+: list i
+
+list = alloca(sizeof(elm) 10 *)
+
+for i (0, 10) {
+    : offset = sizeof(elm) i *
+    elm[list offset +].name = "test"
+    elm[list offset +].value = i
+}
+
+for i (0, 10) {
+    dump(elm[list sizeof(elm) i * +].value)
+}

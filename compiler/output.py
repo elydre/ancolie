@@ -6,12 +6,12 @@ def get_static_addr(size: int, data: list = None):
     if data == None:
         data = [0] * size
     elif len(data) != size:
-        utl.say_error(f"(Internal) Data size mismatch in get_static_addr\nExpected {size}, got {len(data)}")
+        utl.say_error(f"Data size mismatch in get_static_addr\nExpected {size}, got {len(data)}", internal=True)
 
     byte_data = bytearray()
     for d in data:
         if type(d) != int or d < 0 or d > 0xFFFF:
-            utl.say_error(f"(Internal) Invalid data value in get_static_addr\nExpected int in range [0, 65535], got {d}")
+            utl.say_error(f"Invalid data value in get_static_addr\nExpected int in range [0, 65535], got {d}", internal=True)
         byte_data += d.to_bytes(2, byteorder='little')
 
     defs.STATIC_ADDR -= size
@@ -141,10 +141,10 @@ class output_code:
 
             for i, v in enumerate([v1, v2, v3, v4]):
                 if type(v) != tuple and v != None:
-                    utl.say_error(f"(Internal) Invalid argument type for opcode {opcode}\nExpected tuple, got {type(v)}")
+                    utl.say_error(f"Invalid argument type for opcode {opcode}\nExpected tuple, got {type(v)}", internal=True)
                 s = (v[0] if v else 0)
                 if s not in [0, 1, 2, 3]:
-                    utl.say_error(f"(Internal) Invalid source type for opcode {opcode}\nExpected 0, 1, 2 or 3, got {s}")
+                    utl.say_error(f"Invalid source type for opcode {opcode}\nExpected 0, 1, 2 or 3, got {s}", internal=True)
                 b[1] |= (s << (2 * -(i - 3)))
 
                 if v == None:
@@ -171,7 +171,7 @@ class output_code:
             self.string = self.string.strip()
 
             if argc != op.argc:
-                utl.say_error(f"(Internal) Bad number of arguments for opcode {opcode}\nExpected {op.argc}, got {argc}")
+                utl.say_error(f"Bad number of arguments for opcode {opcode}\nExpected {op.argc}, got {argc}", internal=True)
 
             self.psize = len(b) // 2
             self.bytes = b
@@ -235,7 +235,7 @@ class output_code:
             elif instr.type == self.instruction.TYPE_PUSH_LABEL:
                 print(f"\033[33m{hex(pc)[2:].zfill(4)}: {instr.string}\033[0m")
             else:
-                utl.say_error(f"(Internal) Unknown instruction type: {instr.type}")
+                utl.say_error(f"Unknown instruction type: {instr.type}", internal=True)
             pc += instr.psize
 
     def resolve_labels(self):
@@ -253,14 +253,14 @@ class output_code:
             if instr.type == self.instruction.TYPE_GOTO:
                 resolved_address = label_addresses.get(instr.goto_label)
                 if resolved_address is None:
-                    utl.say_error(f"(Internal) Unknown label: {instr.goto_label}")
+                    utl.say_error(f"Unknown label: {instr.goto_label}", internal=True)
                 # replace the goto instruction with a jmp instruction
                 instr.setopcode("jmp", (1, resolved_address), instr.goto_val, None, None)
 
             elif instr.type == self.instruction.TYPE_PUSH_LABEL:
                 resolved_address = label_addresses.get(instr.goto_label)
                 if resolved_address is None:
-                    utl.say_error(f"(Internal) Unknown label: {instr.goto_label}")
+                    utl.say_error(f"Unknown label: {instr.goto_label}", internal=True)
                 # replace the push_label instruction with a push instruction
                 instr.setopcode("push", (1, resolved_address), None, None, None)
 

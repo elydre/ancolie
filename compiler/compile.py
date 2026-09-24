@@ -69,7 +69,7 @@ def compile_assembly(lines):
             continue
 
         if len(gen) != 1:
-            utl.say_error(f"(Internal) Unexpected number of arguments for jump")
+            utl.say_error("Unexpected number of arguments for jump", internal=True)
 
         output.add_goto(label, *gen)
 
@@ -127,10 +127,7 @@ def compile_line(lines: list, labels: tuple, tree: list):
 
             end_brackets = 1 + ptrlvl * 2
             if len(tokens) < end_brackets:
-                if ptrlvl:
-                    utl.say_error(f"Bad pointer declaration\nSyntax example: {def_char} [ptr_name]")
-                else:
-                    utl.say_error(f"Bad variable declaration\nSyntax example: {def_char} var_name")
+                utl.say_error(f"Bad pointer declaration\nSyntax example: {def_char} [ptr_name]")
 
             # check for closing brackets
             if ptrlvl and (ptrlvl * ']' != ''.join(tokens[1 + ptrlvl:2 + ptrlvl * 2])):
@@ -146,8 +143,23 @@ def compile_line(lines: list, labels: tuple, tree: list):
                 utl.say_error(f"Invalid variable name: {tokens[ptrlvl]}")
 
             if def_char == defs.NEW_VAR:
-                defs.variable(var_name, ptrlvl).add()
+                v = defs.variable(var_name, ptrlvl)
+                v.add()
                 # variable will be automaticly added to stack by compile_lines
+
+                if len(tokens) > end_brackets + 1 and tokens[end_brackets] == '=':
+                    fast_assignment = op.fast_assign_var(v, tokens[end_brackets + 1:])
+
+                    if fast_assignment:
+                        output.atend(fast_assignment)
+                        break
+
+                    # reverse polish notation (RPN) expression
+                    output.atend(op.calculate_rpn(tokens[end_brackets + 1:]))
+
+                    # move the result from the stack to the variable's memory location
+                    output.add("pop", (3, utl.to_u16(-v.offset)))
+                    break
 
             else:
                 if len(tokens) > end_brackets:
@@ -163,7 +175,15 @@ def compile_line(lines: list, labels: tuple, tree: list):
             tokens = tokens[end_brackets:]
 
     elif defs.is_variable(tokens[0]):
-        if len(tokens) < 3 or tokens[1] != '=':
+        if len(tokens) == 2 and tokens[1] in ("++", "--"):
+            v = defs.get_variable(tokens[0])
+
+            output.add("add" if tokens[1] == "++" else "sub",
+                    (0, v.addr) if v.is_static else (3, utl.to_u16(-v.offset)), (1, 1))
+
+            return (output, 1)
+
+        elif len(tokens) < 3 or tokens[1] != '=':
             utl.say_error(f"Bad variable assignment\nSyntax example: var_name = 123")
 
         v = defs.get_variable(tokens[0])
@@ -180,9 +200,7 @@ def compile_line(lines: list, labels: tuple, tree: list):
             if v.is_static:
                 output.add("pop", (0, v.addr))
             else:
-                output.add("pop",
-                        (3, utl.to_u16(-v.offset)))
-
+                output.add("pop", (3, utl.to_u16(-v.offset)))
 
     elif tokens[0] == "[":
         o, end = op.load_ptraddr(tokens)
@@ -195,13 +213,10 @@ def compile_line(lines: list, labels: tuple, tree: list):
         # reverse polish notation (RPN) expression
         output.atend(op.calculate_rpn(tokens[end + 1:]))
 
-        # move the result from the stack to the pointer's memory location
-        output.add("mss",
-                (2, 1), (1, 0),
-                (0, defs.STACK_PTR), (1, 0))
+        # pop the result from the stack to the pointer's memory location
+        output.add("pops", (2, 1), (1, 0))
 
-        # pop the pointer's address and the value to assign
-        output.add("pop", (1, 0))
+        # pop the pointer's address
         output.add("pop", (1, 0))
 
     elif defs.is_func(tokens[0]):
@@ -210,6 +225,23 @@ def compile_line(lines: list, labels: tuple, tree: list):
             utl.say_error(f"Bad syntax on function call\nSyntax example: {f.name}({', '.join(['var' + str(i + 1) for i in range(f.argc)])})")
 
         output.atend(op.call_func(f, tokens[2:-1]))
+
+    elif defs.is_struct(tokens[0]):
+        o, end = op.load_fieldaddr(tokens)
+
+        if len(tokens) < end + 2 or tokens[end] != '=':
+            utl.say_error(f"Bad struct field assignment\nSyntax example: struct_name[address].field_name = 123")
+
+        output.atend(o)
+
+        # reverse polish notation (RPN) expression
+        output.atend(op.calculate_rpn(tokens[end + 1:]))
+
+        # pop the result from the stack to the pointer's memory location
+        output.add("pops", (2, 1), (1, 0))
+
+        # pop the pointer's address
+        output.add("pop", (1, 0))
 
     elif tokens[0] == "if":
         if len(tokens) < 2:
@@ -322,7 +354,7 @@ def compile_line(lines: list, labels: tuple, tree: list):
         output.atend(inner_output)
         output.add_label(fin_label)
 
-        return (output, closing_line + 1) # return the number of lines to skip
+        return (output, closing_line + 1)
 
     elif tokens[0] == "for":
         # Syntax: for var (debut, fin)
@@ -401,7 +433,7 @@ def compile_line(lines: list, labels: tuple, tree: list):
         if len(args) == 2:
             output.add("pop", (1, 0)) # pop the fin value from the stack
 
-        return (output, closing_line + 1) # return the number of lines to skip
+        return (output, closing_line + 1)
 
     elif tokens[0] in ("func", "vafunc"):
         if tree != []:
@@ -446,7 +478,7 @@ def compile_line(lines: list, labels: tuple, tree: list):
 
         f.opcodes = inner_output
 
-        return (output, closing_line + 1) # return the number of lines to skip
+        return (output, closing_line + 1)
 
     elif tokens[0] == "sub":
         if len(tokens) != 1:
@@ -472,7 +504,7 @@ def compile_line(lines: list, labels: tuple, tree: list):
         output.add("mov",
                    (0, defs.STACK_PTR), (3, utl.to_u16(-var_offset)))
 
-        return (output, closing_line + 1) # return the number of lines to skip
+        return (output, closing_line + 1)
 
     elif tokens[0] == "asm":
         if len(tokens) != 1:
@@ -483,8 +515,58 @@ def compile_line(lines: list, labels: tuple, tree: list):
 
         output.atend(compile_assembly(lines[2:closing_line]))
 
-        return (output, closing_line + 1) # return the number of lines to skip
+        return (output, closing_line + 1)
 
+    elif tokens[0] == "struct":
+        if len(tokens) < 2:
+            utl.say_error("Bad syntax\nSyntax example: struct name { ... }")
+
+        if not defs.is_valid_name(tokens[1]):
+            utl.say_error(f"Invalid struct name: {tokens[1]}")
+
+        if defs.is_struct(tokens[1]):
+            utl.say_error(f"Struct already exists: {tokens[1]}")
+
+        # interpret the lines inside the struct block as variable declarations
+        closing_line = toks.locate_braces(lines)
+        struct_lines = lines[2:closing_line]
+
+        struct = defs.struct(tokens[1])
+        struct.add()
+
+        for line in struct_lines:
+            defs.CURRENT_LNO, tokens = line
+
+            if len(tokens) < 2 or tokens[0] != defs.NEW_VAR:
+                utl.say_error(f"Bad field declaration in struct\nSyntax example: struct {tokens[1]} {{ {defs.NEW_VAR} field_name }}")
+
+            tokens = tokens[1:]
+
+            while len(tokens) > 0:
+                ptrlvl = 0
+                while tokens[ptrlvl] == '[':
+                    ptrlvl += 1
+
+                end_brackets = 1 + ptrlvl * 2
+                if len(tokens) < end_brackets:
+                    utl.say_error(f"Bad pointer declaration\nSyntax example: {def_char} [ptr_name]")
+
+                # check for closing brackets
+                if ptrlvl and (ptrlvl * ']' != ''.join(tokens[1 + ptrlvl:2 + ptrlvl * 2])):
+                    utl.say_error(f"Bad pointer declaration\nSyntax example: {def_char} [ptr_name]")
+
+                field_name = tokens[ptrlvl]
+
+                if not defs.is_valid_name(field_name):
+                    utl.say_error(f"Invalid field name: {field_name}")
+
+                if struct.get_field(field_name):
+                    utl.say_error(f"Field already exists in struct {struct.name}: {field_name}")
+
+                struct.add_field(field_name, ptrlvl)
+                tokens = tokens[end_brackets:]
+
+        return (output, closing_line + 1)
 
     elif tokens[0] == "break":
         if not labels:
@@ -529,6 +611,9 @@ def compile_line(lines: list, labels: tuple, tree: list):
     elif tokens[0] in ("else", "elif"):
         utl.say_error(f"Unexpected {tokens[0]} statement outside of an if block\n" +
                         "Syntax example: if var == 0 { ... } elif var == 1 { ... } else { ... }")
+
+    elif tokens[0] in defs.CHARS_SPE:
+        utl.say_error(f"Unexpected character: '{tokens[0]}'")
 
     else:
         utl.say_error(f"Unknown word: {tokens[0]}")

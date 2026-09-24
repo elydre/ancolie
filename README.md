@@ -5,7 +5,7 @@ custom instruction set, esoteric programming language (`ancolie`), single pass c
 ## how to use ?
 
 ```sh
-# compile a ancolie program
+# compile an ancolie program
 python llc.py -o program.bin program.li
 
 # emulator without GUI support
@@ -40,9 +40,9 @@ gcc -DGUI -o emulator emulator.c -lSDL2 -lSDL2_ttf
 - [x] sub stack scope
 - [x] variable arguments function
 - [x] asm statements
+- [x] structs
 - [ ] preprocessor *- in progress*
 - [ ] heap arrays
-- [ ] structs
 - [ ] multiple source files
 
 ### Extra
@@ -134,6 +134,19 @@ vafunc sum(argc, argp) {    // variable arguments function
 : res
 res = add(3, 4)             // res will be 7
 res = sum(1, 2, 3, 4, 5)    // res will be 15
+
+/* Structs are declared with the `struct` keyword.
+** They can be considered as lists of named values.
+*/
+struct point {
+    : x
+    : y
+}
+
+: p = alloca(sizeof(point)) // allocate memory for a point
+
+point[p].x = 3              // set the x value of the point
+point[p].y = 4              // set the y value of the point
 
 /* Assembly integration is possible with the `asm` keyword.
 ** The assembly code can use ancolie variables.

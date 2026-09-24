@@ -1,4 +1,5 @@
 import compiler.output as out
+import compiler.utils as utl
 import compiler.defs as defs
 import compiler.op as op
 
@@ -34,6 +35,20 @@ def blt_array(args: list):
     output.add("mov",
             (0, defs.FUNC_RET_ADDR),
             (0, defs.STACK_PTR))
+
+    return output
+
+def blt_sizeof(args: list):
+    output = out.output_code()
+
+    if len(args[0]) != 1 or not defs.is_struct(args[0][0]):
+        utl.say_error(f"sizeof() expects a struct name as argument")
+
+    struct = defs.get_struct(args[0][0])
+
+    output.add("mov",
+            (0, defs.FUNC_RET_ADDR),
+            (1, struct.get_size()))
 
     return output
 
@@ -130,6 +145,7 @@ def blt_get_screen(args: list):
 def add_builtin_functions():
     defs.func("alloca",      1, True,  is_builtin=True, blt_handler = blt_alloca, no_rpn=True).add()
     defs.func("array",       0, True,  is_builtin=True, blt_handler = blt_array, no_rpn=True, is_vaargs=True).add()
+    defs.func("sizeof",      1, True,  is_builtin=True, blt_handler = blt_sizeof).add()
     defs.func("out",         2, False, is_builtin=True, blt_handler = blt_out).add()
     defs.func("in",          1, True,  is_builtin=True, blt_handler = blt_in).add()
     defs.func("dump",        1, False, is_builtin=True, blt_handler = blt_dump).add()

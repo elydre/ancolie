@@ -12,8 +12,14 @@ char_escape_dict = {
     "\\\\": 92
 }
 
-def say_error(message):
+def say_error(message, internal=False):
+    if internal:
+        print(end = "Internal ")
     print(f"Error line {defs.CURRENT_LNO}: {message}")
+
+    if internal:
+        raise Exception(message)
+
     exit(1)
 
 def say_extra_error(message):

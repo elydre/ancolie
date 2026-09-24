@@ -6,7 +6,6 @@ class opcode:
         self.opcode = opcode
         self.argc = argc
 
-
 class variable:
     def __init__(self, name, ptrlvl, offset_or_addr = -1, scope = None, is_static = False, is_func_arg = False):
         self.name = name
@@ -19,7 +18,7 @@ class variable:
 
         if offset_or_addr == -1:
             if is_static:
-                utl.say_error(f"(Internal) Static variable {name} must have an address")
+                utl.say_error(f"Static variable {name} must have an address", internal=True)
             if scope in LOCAL_VARS.keys() and LOCAL_VARS[scope]:
                 offset_or_addr = LOCAL_VARS[scope][-1].offset + 1
             else:
@@ -59,6 +58,42 @@ class func:
     def add(self):
         ALL_FUNCS.append(self)
 
+class struct:
+    class struct_field:
+        def __init__(self, name, ptrlvl, offset):
+            self.name = name
+            self.ptrlvl = ptrlvl
+            self.offset = offset
+
+    def __init__(self, name):
+        self.name = name
+        self.fields = []
+
+    def add_field(self, name, ptrlvl):
+        self.fields.append(struct.struct_field(name, ptrlvl, self.get_size()))
+
+    def get_field(self, name):
+        if not any(e.name == name for e in self.fields):
+            return None
+
+        return next(e for e in self.fields if e.name == name)
+
+    def get_size(self):
+        return len(self.fields)
+
+    def add(self):
+        ALL_STRUCTS.append(self)
+
+
+def is_opcode(s):
+    return s in [e.name for e in OPCODES]
+
+def get_opcode(name):
+    for e in OPCODES:
+        if e.name == name:
+            return e
+    utl.say_error(f"Unknown opcode: {name}", internal=True)
+
 
 def is_variable(s, scope = None):
     if scope is None:
@@ -96,14 +131,14 @@ def get_func(s):
     return next(e for e in ALL_FUNCS if e.name == s)
 
 
-def is_opcode(s):
-    return s in [e.name for e in OPCODES]
+def is_struct(s):
+    return s in [e.name for e in ALL_STRUCTS]
 
-def get_opcode(name):
-    for e in OPCODES:
-        if e.name == name:
-            return e
-    utl.say_error(f"(Internal) Unknown opcode: {name}")
+def get_struct(s):
+    if not is_struct(s):
+        utl.say_error(f"Unknown struct: {s}")
+
+    return next(e for e in ALL_STRUCTS if e.name == s)
 
 
 def is_valid_name(s):
@@ -157,11 +192,11 @@ MEMORY_SIZE = 65536 - (80 * 25)
 MAGIC_NUMBER = 0xF057
 ARCH_VERSION = 0x0100
 
-CHARS_SPE = [",", "(", ")", ":", "=", "{", "}", "[", "]", "&", "$", "!", "//", "' '", "#"]
+CHARS_SPE = [",", ".", "(", ")", ":", "=", "{", "}", "[", "]", "&", "$", "!", "//", "' '", "#", "++", "--"]
 CHARS_OPR = ["+", "-", "*", "/", "%", "==", "!=", "<", ">", "<=", ">=", "&&", "|"]
 CHARS_SPE += CHARS_OPR
 
-KEYWORDS = ["if", "elif", "else", "while", "func", "vafunc", "return", "break", "continue", "for", "sub", "asm"]
+KEYWORDS = ["if", "elif", "else", "while", "func", "vafunc", "return", "break", "continue", "for", "sub", "asm", "struct"]
 
 NEW_VAR = ":"
 NEW_VAR_STATIC = "$"
@@ -184,5 +219,6 @@ LOCAL_VARS = {}
 STATIC_VARS = {}
 
 ALL_FUNCS = []
+ALL_STRUCTS = []
 
 DATA_SEQ = []
