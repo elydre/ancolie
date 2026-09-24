@@ -21,7 +21,7 @@ def compile_assembly(lines):
         # label definition
         if len(tokens) == 2 and tokens[1] == ":":
             label = f"{asm_id}_{tokens[0]}"
-            if not defs.is_valid_name(tokens[0]):
+            if not utl.is_valid_name(tokens[0]):
                 utl.say_error(f"Invalid label name: {tokens[0]}")
             if output.does_label_exist(label):
                 utl.say_error(f"Label already exists: {tokens[0]}")
@@ -139,7 +139,7 @@ def compile_line(lines: list, labels: tuple, tree: list):
             if defs.is_variable(var_name):
                 utl.say_error(f"Variable already exists: {tokens[ptrlvl]}")
 
-            if not defs.is_valid_name(var_name):
+            if not utl.is_valid_name(var_name):
                 utl.say_error(f"Invalid variable name: {tokens[ptrlvl]}")
 
             if def_char == defs.NEW_VAR:
@@ -165,12 +165,15 @@ def compile_line(lines: list, labels: tuple, tree: list):
                 if len(tokens) > end_brackets:
                     if tokens[end_brackets] != '=' or len(tokens) != end_brackets + 2 or not utl.is_number(tokens[end_brackets + 1]):
                         utl.say_error(f"Bad static variable declaration, only const expected\nSyntax example: {tokens[0]} = 123")
-                    val = int(tokens[end_brackets + 1])
+                    val = utl.to_number(tokens[end_brackets + 1])
                 else:
-                    val = 0
+                    val = None
 
-                addr = out.get_static_addr(1, [val])
+                addr = out.get_static_addr(1, [val if val else 0])
                 defs.variable(var_name, ptrlvl, addr, is_static = True).add()
+
+                if val is not None:
+                    break
 
             tokens = tokens[end_brackets:]
 
@@ -442,7 +445,7 @@ def compile_line(lines: list, labels: tuple, tree: list):
         if len(tokens) < 4 or tokens[2] != '(' or tokens[-1] != ')':
             utl.say_error(f"Bad syntax\nSyntax example: {tokens[0]} func_name(arg1, arg2)")
 
-        if not defs.is_valid_name(tokens[1]):
+        if not utl.is_valid_name(tokens[1]):
             utl.say_error(f"Invalid function name: {tokens[1]}")
 
         if defs.is_func(tokens[1]):
@@ -454,7 +457,7 @@ def compile_line(lines: list, labels: tuple, tree: list):
         for i, e in enumerate(args):
             if len(e) != 1:
                 utl.say_error(f"Bad syntax in arguments\nSyntax example: {tokens[0]} func_name(arg1, arg2)")
-            if not defs.is_valid_name(e[0]):
+            if not utl.is_valid_name(e[0]):
                 utl.say_error(f"Invalid argument name: {e[0]}")
             defs.variable(e[0], 0, i + 1, is_func_arg = True, scope = new_scope).add()
 
@@ -521,7 +524,7 @@ def compile_line(lines: list, labels: tuple, tree: list):
         if len(tokens) < 2:
             utl.say_error("Bad syntax\nSyntax example: struct name { ... }")
 
-        if not defs.is_valid_name(tokens[1]):
+        if not utl.is_valid_name(tokens[1]):
             utl.say_error(f"Invalid struct name: {tokens[1]}")
 
         if defs.is_struct(tokens[1]):
@@ -557,7 +560,7 @@ def compile_line(lines: list, labels: tuple, tree: list):
 
                 field_name = tokens[ptrlvl]
 
-                if not defs.is_valid_name(field_name):
+                if not utl.is_valid_name(field_name):
                     utl.say_error(f"Invalid field name: {field_name}")
 
                 if struct.get_field(field_name):

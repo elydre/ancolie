@@ -7,12 +7,13 @@ func shell_clear(argc, argv) {
 }
 
 func shell_help(argc, argv) {
-    print("clear   clear the screen\n")
-    print("echo    echo the input arguments\n")
-    print("halt    halt the system\n")
-    print("help    display this help message\n")
-    print("sp      print the stack pointer\n")
-    print("time    print the current time\n")
+    print("clear     clear the screen\n")
+    print("color XX  change the text color\n")
+    print("echo      echo the input arguments\n")
+    print("halt      halt the system\n")
+    print("help      display this help message\n")
+    print("sp        print the stack pointer\n")
+    print("time      print the current time\n")
 }
 
 func shell_halt(argc, argv) {
@@ -42,6 +43,23 @@ func shell_time(argc, argv) {
     printf("it is %d:%d\n", t 1000 / 6 +, t 1000 % 50 * 833 /)
 }
 
+func shell_color(argc, argv) {
+    : color
+
+    if strlen([argv 1 +]) 2 != {
+        print("Invalid color, must be 2 hex digits like '0F' or 'A7'\n")
+        return
+    }
+
+    color = screen_mk_color([argv 1 +])
+    if color 1 == {
+        print("Invalid color, must be 2 hex digits like '0F' or 'A7'\n")
+        return
+    }
+
+    screen_color = color
+}
+
 func interpret(buffer) {
     : arg_count
     : args i
@@ -69,6 +87,8 @@ func interpret(buffer) {
         shell_sp(arg_count, args)
     } elif streq([args], "time") {
         shell_time(arg_count, args)
+    } elif streq([args], "color") {
+        shell_color(arg_count, args)
     } else {
         printf("unknown command: %s\n", [args])
         print("type 'help' for a list of available commands\n")

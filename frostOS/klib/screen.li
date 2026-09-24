@@ -12,7 +12,7 @@ func screen_clear() {
 func putchar(c) {
     if c '\n' == {
         screen_x = 0
-        screen_y = screen_y 1 +
+        screen_y++
         return
     }
     if c '\r' == {
@@ -21,22 +21,22 @@ func putchar(c) {
     }
     if c '\b' == {
         if screen_x 0 > {
-            screen_x = screen_x 1 -
+            screen_x--
         }
         [screen 80 screen_y * + screen_x +] = ' '
         return
     }
     if screen_x 79 > {
         screen_x = 0
-        screen_y = screen_y 1 +
+        screen_y++
     }
     if screen_y 24 > {
         memmov(screen, screen 80 +, 80 24 *)
         memset(screen 80 24 * +, ' ', 80)
         screen_y = 24
     }
-    [screen 80 screen_y * + screen_x +] = c
-    screen_x = screen_x 1 +
+    [screen 80 screen_y * + screen_x +] = c screen_color |
+    screen_x++
 }
 
 func putnbr(n) {
@@ -73,6 +73,27 @@ func print(str) {
     screen_flush()
 }
 
+func screen_mk_color(str) {
+    : i c color
+
+    color = 0
+
+    for i (0, 2) {
+        c = [str i +]
+        if c '0' >= c '9' <= && {
+            color = color 16 * c '0' - +
+        } elif c 'A' >= c 'F' <= && {
+            color = color 16 * c 55 - +
+        } elif c 'a' >= c 'f' <= && {
+            color = color 16 * c 87 - +
+        } else {
+            return 1
+        }
+    }
+
+    return color 8 <<
+}
+
 vafunc printf(argc, argp) {
     : i c str
 
@@ -84,14 +105,14 @@ vafunc printf(argc, argp) {
             break
         }
         if c '%' == {
-            i = i 1 +
+            i++
             c = [str i +]
             if c '%' == {
                 putchar('%')
                 continue
             }
-            argp = argp 1 +
-            argc = argc 1 -
+            argp++
+            argc--
             if argc 0 == {
                 print("\n[printf not enough arguments]\n")
                 return
@@ -110,6 +131,21 @@ vafunc printf(argc, argp) {
             elif c 'c' == {
                 putchar([argp])
             }
+            continue
+        }
+        if c '$' == {
+            i++
+            if [str i +] '$' == {
+                putchar('$')
+                continue
+            }
+            c = screen_mk_color(str i +)
+            if c 1 == {
+                print("\n[printf invalid color]\n")
+                return
+            }
+            screen_color = c
+            i++
             continue
         }
         putchar(c)

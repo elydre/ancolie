@@ -87,17 +87,47 @@ typedef struct {
 
 gui_context_t gui;
 
-static inline void print_char(uint32_t xo, uint32_t yo, char c, uint32_t fg) {
-    if (c == 0) c = ' ';
+static inline uint32_t color4bit_to_sdl(uint8_t color) {
+    static uint32_t colors[16] = {
+        0x000000FF, // black
+        0xAA0000FF, // red
+        0x00AA00FF, // green
+        0xAAAA00FF, // yellow
+        0x0000AAFF, // blue
+        0xAA00AAFF, // magenta
+        0x00AAAAFF, // cyan
+        0xAAAAAAFF, // white
+        0x555555FF, // bright black (gray)
+        0xFF5555FF, // bright red
+        0x55FF55FF, // bright green
+        0xFFFF55FF, // bright yellow
+        0x5555FFFF, // bright blue
+        0xFF55FFFF, // bright magenta
+        0x55FFFFFF, // bright cyan
+        0xFFFFFFFF  // bright white
+    };
 
-    uint8_t *char_data = gui.font->data + (c * gui.font->charsize);
+    if (color > 15)
+        return 0xFFFFFFFF;
+
+    return colors[color];
+}
+
+static inline void print_char(uint32_t xo, uint32_t yo, uint16_t c) {
+    if (c == 0)
+        c = ' ';
+    
+    uint32_t fg = color4bit_to_sdl((c >> 8) & 0x0F);
+    uint32_t bg = color4bit_to_sdl((c >> 12) & 0x0F);
+
+    uint8_t *char_data = gui.font->data + ((c & 0xFF) * gui.font->charsize);
 
     uint32_t x = 0;
     uint32_t y = 0;
 
     for (uint32_t i = 0; i < gui.font->charsize; i++) {
         for (int j = 7; j >= 0; j--) {
-            gui.fb[(xo + x) + (yo + y) * (gui.pitch / 4)] = char_data[i] & (1 << j) ? fg : 0;
+            gui.fb[(xo + x) + (yo + y) * (gui.pitch / 4)] = char_data[i] & (1 << j) ? fg : bg;
             if (x == gui.font->width - 1) {
                 x = 0;
                 y++;
@@ -109,7 +139,7 @@ static inline void print_char(uint32_t xo, uint32_t yo, char c, uint32_t fg) {
 }
 
 void rwmem_to_screen(void) {
-    static char last_screen[SCREEN_X * SCREEN_Y];
+    static uint16_t last_screen[SCREEN_X * SCREEN_Y];
     static int last_cursor_pos = -1;
 
     int cursor_x, cursor_y;
@@ -118,24 +148,22 @@ void rwmem_to_screen(void) {
         if (last_cursor_pos >= 0 && last_cursor_pos < SCREEN_X * SCREEN_Y) {
             cursor_x = last_cursor_pos % SCREEN_X;
             cursor_y = last_cursor_pos / SCREEN_X;
-            print_char(cursor_x * gui.font->width, cursor_y * gui.font->height,
-                    rwmem[SCREEN_MEMORY + cursor_y * SCREEN_X + cursor_x] & 0xFF, 0xFFFFFFFF);
+            uint16_t c = rwmem[SCREEN_MEMORY + cursor_y * SCREEN_X + cursor_x];
+            print_char(cursor_x * gui.font->width, cursor_y * gui.font->height, c);
         }
         last_cursor_pos = gui.cursor_pos;
     }
 
     for (int y = 0; y < SCREEN_Y; y++) {
         for (int x = 0; x < SCREEN_X; x++) {
-            char c = rwmem[SCREEN_MEMORY + y * SCREEN_X + x] & 0xFF;
+            uint16_t c = rwmem[SCREEN_MEMORY + y * SCREEN_X + x];
             if (last_screen[y * SCREEN_X + x] != c) {
-                print_char(x * gui.font->width, y * gui.font->height, c, 0xFFFFFFFF);
+                print_char(x * gui.font->width, y * gui.font->height, c);
                 last_screen[y * SCREEN_X + x] = c;
             }
         }
     }
 
-    // print_char((gui.cursor_pos % SCREEN_X) * gui.font->width,
-    //         (gui.cursor_pos / SCREEN_X) * gui.font->height, '_', 0xAAAAAAAA);
     cursor_x = gui.cursor_pos % SCREEN_X;
     cursor_y = gui.cursor_pos / SCREEN_X;
 
@@ -144,7 +172,6 @@ void rwmem_to_screen(void) {
             gui.fb[(cursor_x * gui.font->width + x) + (cursor_y * gui.font->height + y) * (gui.pitch / 4)] ^= 0xAAAAAAAA;
         }
     }
-
 }
 
 font_data_t *load_psf_font(const char *path) {
@@ -318,7 +345,7 @@ void gui_loop(uint64_t ips, uint64_t delta_time) {
 
     // Render the info line
     for (int i = 0; i < 80; i++) {
-        print_char(i * gui.font->width, SCREEN_Y * gui.font->height, str[i], 0xAAAAAAAA);
+        print_char(i * gui.font->width, SCREEN_Y * gui.font->height, str[i] | (0x07 << 8));
     }
 
     update_gui();

@@ -1,6 +1,7 @@
 $ screen
 $ screen_x
 $ screen_y
+$ screen_color = 0x0F00
 
 screen = _get_screen()
 

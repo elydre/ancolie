@@ -19,7 +19,7 @@ func input(buffer, size) {
 
         if chr '\b' == {
             if buffer_i 0 > {
-                buffer_i = buffer_i 1 -
+                buffer_i--
                 putchar('\b')
                 screen_flush()
             }
@@ -37,7 +37,7 @@ func input(buffer, size) {
             [buffer buffer_i +] = chr
             putchar(chr)
             screen_flush()
-            buffer_i = buffer_i 1 +
+            buffer_i++
         }
     }
 }

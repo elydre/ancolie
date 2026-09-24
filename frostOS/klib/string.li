@@ -3,30 +3,41 @@ func streq(s1, s2) {
         if [s1] 0 == [s2] 0 == && {
             return 1
         }
-        s1 = s1 1 +
-        s2 = s2 1 +
+        s1++
+        s2++
     }
     return 0
+}
+
+func strlen(str) {
+    : len
+
+    len = 0
+    while [str len +] {
+        len++
+    }
+
+    return len
 }
 
 func strsplit_count(buffer, delimiter) {
     : arg_count
 
     while [buffer] ' ' == {
-        buffer = buffer 1 +
+        buffer++
     }
 
     arg_count = 0
     while [buffer] {
         while [buffer] ' ' != [buffer] && {
-            buffer = buffer 1 +
+            buffer++
         }
 
         while [buffer] ' ' == {
-            buffer = buffer 1 +
+            buffer++
         }
     
-        arg_count = arg_count 1 +
+        arg_count++
     }
 
     return arg_count
@@ -36,19 +47,18 @@ func strsplit(buffer, args) {
     : arg_count tmp
 
     while [buffer] ' ' == {
-        buffer = buffer 1 +
+        buffer++
     }
 
     arg_count = 0
     while [buffer] {
         [args arg_count +] = buffer
-        arg_count = arg_count 1 +
+        arg_count++
         while [buffer] ' ' != [buffer] && {
-            buffer = buffer 1 +
+            buffer++
         }
         while [buffer] ' ' == {
-            [buffer] = 0
-            buffer = buffer 1 +
+            [buffer++] = 0
         }
     }
 }

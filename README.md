@@ -256,6 +256,7 @@ each argument can be one of the following:
 | `0x1030`     | in        | get ingame time in ticks                       |
 | `0x1031`     | out       | sleep for `n` ticks (1 tick = 50ms)            |
 
+Screen is a 80x25 text screen located in memory at address `0xF830`. Each word represents a character and its color. The lower 8 bits are the ASCII code of the character, and the upper 8 bits are the color (4 bits for foreground and 4 bits for background).
 
 ## Compiled file format
 
@@ -290,3 +291,12 @@ section 1 dest-addr  (16 bit)
 section type:
 - 0: code (in X memory)
 - 1: data (in RW memory)
+
+## Notes
+
+The language was originally designed for the Minecraft [Cream](https://github.com/elydre/cream) mod. Special thanks to [asqel](https://github.com/asqel) for his advice on the language's syntax. Feel free to contact me with questions or to chat on Discord at `@pf4`.
+
+### Extra repositories
+
+- [Cream](https://github.com/elydre/cream) Minecraft mod with a computer using this instruction set
+- [Elydrian Langs](https://github.com/elydre/elydrian-langs) VSCode extension for ancolie syntax highlighting

@@ -141,19 +141,6 @@ def get_struct(s):
     return next(e for e in ALL_STRUCTS if e.name == s)
 
 
-def is_valid_name(s):
-    if not s:
-        return False
-    if not (s[0].isalpha() or s[0] == "_"):
-        return False
-    for c in s:
-        if not (c.isalnum() or c == "_"):
-            return False
-    if s in KEYWORDS:
-        return False
-    return True
-
-
 OPCODES = [
     opcode("nop",    0x00, 0),
     opcode("mov",    0x01, 2),
@@ -193,7 +180,7 @@ MAGIC_NUMBER = 0xF057
 ARCH_VERSION = 0x0100
 
 CHARS_SPE = [",", ".", "(", ")", ":", "=", "{", "}", "[", "]", "&", "$", "!", "//", "' '", "#", "++", "--"]
-CHARS_OPR = ["+", "-", "*", "/", "%", "==", "!=", "<", ">", "<=", ">=", "&&", "|"]
+CHARS_OPR = ["+", "-", "*", "/", "%", ">>", "<<", "==", "!=", "<", ">", "<=", ">=", "&&", "|"]
 CHARS_SPE += CHARS_OPR
 
 KEYWORDS = ["if", "elif", "else", "while", "func", "vafunc", "return", "break", "continue", "for", "sub", "asm", "struct"]

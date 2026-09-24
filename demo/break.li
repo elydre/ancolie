@@ -1,18 +1,16 @@
-:i
-
-i = 0
+:i = 0
 
 while i 10 < {
     if i 2 % 0 == {
         dump(555)
-        i = i 1 +
+        i++
         continue
     }
     if i 5 > {
         break
     }
     dump(i)
-    i = i 1 +
+    i++
 }
 
 dump(123)

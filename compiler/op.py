@@ -196,6 +196,14 @@ def calculate_rpn(rpn: list):
                 output.add("and", a, b)
             elif token == '|':
                 output.add("bor", a, b)
+            elif token == '>>':
+                if tmp_number is None:
+                    utl.say_error(f"Bitshift operator requires a number as second operand")
+                output.add("div", a, (1, 2 ** tmp_number))
+            elif token == '<<':
+                if tmp_number is None:
+                    utl.say_error(f"Bitshift operator requires a number as second operand")
+                output.add("mul", a, (1, 2 ** tmp_number))
             else:
                 utl.say_error(f"Unknown operator in RPN expression: {token}", internal=True)
 

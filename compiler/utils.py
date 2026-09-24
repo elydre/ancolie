@@ -33,6 +33,18 @@ def verbose(message):
         return
     print(message)
 
+def is_valid_name(s):
+    if not s:
+        return False
+    if not (s[0].isalpha() or s[0] == "_"):
+        return False
+    for c in s:
+        if not (c.isalnum() or c == "_"):
+            return False
+    if s in defs.KEYWORDS:
+        return False
+    return True
+
 CURRENT_LABEL = 0
 
 def get_new_label():
@@ -62,15 +74,6 @@ def is_number(s):
     except ValueError:
         return False
 
-def is_char(s):
-    if s[0] != "'" or s[-1] != "'":
-        return False
-    if len(s) == 3:
-        return True
-    if len(s) == 4 and s[1:3] in char_escape_dict:
-        return True
-    return False
-
 def to_number(s):
     if is_char(s):
         if len(s) == 3:
@@ -81,6 +84,15 @@ def to_number(s):
         return int(s, 16)
     else:
         return int(s)
+
+def is_char(s):
+    if s[0] != "'" or s[-1] != "'":
+        return False
+    if len(s) == 3:
+        return True
+    if len(s) == 4 and s[1:3] in char_escape_dict:
+        return True
+    return False
 
 def is_string(s):
     if s[0] != '"' or s[-1] != '"':
