@@ -13,7 +13,7 @@ gcc -o emulator emulator.c
 ./emulator program.bin
 
 # emulator with GUI support
-gcc -DGUI -o emulator emulator.c -lSDL2 -lSDL2_ttf
+gcc -DGUI -o emulator emulator.c -lSDL2
 ./emulator --gui program.bin
 ```
 
@@ -165,6 +165,22 @@ asm {
 }
 ```
 
+### Built-in functions
+
+| FUNCTION                  | DESCRIPTION                                             |
+| ------------------------- | ------------------------------------------------------- |
+| `addr = alloca(size)`     | allocate `size` bytes on the stack and return a pointer to it |
+| `addr = array(...)`       | allocate an array in the stack and return a pointer to it     |
+| `size = sizeof(struct)`   | return the size of a struct in bytes                    |
+| `out(port, val)`          | output `val` to `port`                                  |      
+| `val = in(port)`          | return the value from `port`                            |
+| `dump(num)`               | print the decimal value of `num` to the emulator stdout |
+| `memset(addr, val, size)` | set `size` bytes of memory at `addr` to `val`           |
+| `memmov(dest, src, size)` | copy `size` bytes from `src` to `dest`                  |
+| `halt()`                  | halt the computer                                       |
+| `addr = _get_sp()`        | return the current stack pointer                        |
+| `addr = _get_screen()`    | return the address of the screen memory (`0xF830`)      |
+
 ## Computer architecture
 
 ### opcode (may be subject to change)
@@ -286,17 +302,17 @@ section 1 dest-addr  (16 bit)
 
 - `magic number` is used to identify the file format, it should be `0xF057`
 - `debut` and `size` are in bytes (8 bits), `dest-addr` is in words (16 bit)
-- `section debut` is the offset in the file where the section data starts
+- section `debut` is the offset in the file where the section data starts
 
 section type:
-- 0: code (in X memory)
-- 1: data (in RW memory)
+- `0`: code (in X memory)
+- `1`: data (in RW memory)
 
 ## Notes
 
-The language was originally designed for the Minecraft [Cream](https://github.com/elydre/cream) mod. Special thanks to [asqel](https://github.com/asqel) for his advice on the language's syntax. Feel free to contact me with questions or to chat on Discord at `@pf4`.
+The language was originally designed for the Minecraft [Cream](https://github.com/elydre/cream) mod. Special thanks to [asqel](https://github.com/asqel) for his advice on the language's syntax. Feel free to contact me for questions on Discord at `@pf4`.
 
 ### Extra repositories
 
-- [Cream](https://github.com/elydre/cream) Minecraft mod with a computer using this instruction set
-- [Elydrian Langs](https://github.com/elydre/elydrian-langs) VSCode extension for ancolie syntax highlighting
+- [Cream](https://github.com/elydre/cream): Minecraft mod with a computer using this instruction set
+- [Elydrian Langs](https://github.com/elydre/elydrian-langs): VSCode extension for ancolie syntax highlighting
