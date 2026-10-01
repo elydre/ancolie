@@ -1,6 +1,7 @@
 import compiler.preproc as preproc
 import compiler.builtin as blt
 import compiler.tokens as toks
+import compiler.config as conf
 import compiler.output as out
 import compiler.utils as utl
 import compiler.defs as defs
@@ -62,7 +63,7 @@ def compile_assembly(lines):
             elif len(e) == 5 and e[0] == "[" and e[1] in ["sp", "up"] and e[2] in ["+", "-"] and utl.is_number(e[3]) and e[4] == "]":
                 gen.append((2 if e[1] == "sp" else 3, utl.to_u16(utl.to_number(e[3]) * (1 if e[2] == "+" else -1))))
             else:
-                utl.say_error(f"Bad argument syntax\nSyntax example: 123 OR &var_name OR [123] OR [sp+123] OR [up+123]")
+                utl.say_error("Bad argument syntax", correct_syntax = "123 OR &var_name OR [123] OR [sp+123] OR [up+123]")
 
         if label is None:
             output.add(opcode.name, *gen)
@@ -98,10 +99,11 @@ def compile_lines(lines: list, labels: tuple = None, tree: list = [], new_scope:
     if new_scope is not None:
         variable_decl = out.output_code()
         variable_decl.add_comment(f"\n--- begin of {new_scope} ---")
-        for v in defs.LOCAL_VARS[new_scope]:
-            if v.is_static or v.is_func_arg:
-                continue
+        v_count = len([v for v in defs.LOCAL_VARS[new_scope] if not (v.is_static or v.is_func_arg)])
+        if v_count == 1:
             variable_decl.add("push", (1, 0))
+        elif v_count > 1:
+            variable_decl.add("sub", (0, defs.STACK_PTR), (1, v_count))
         output.atdebut(variable_decl)
         defs.CURRENT_SCOPE = old_scope
 
@@ -112,11 +114,11 @@ def compile_line(lines: list, labels: tuple, tree: list):
     defs.CURRENT_LNO, tokens = lines[0]
 
     output = out.output_code()
-    output.add_comment(f"\nl{defs.CURRENT_LNO:03}  {' '.join(tokens)}")
+    output.add_comment(f"\n{defs.CURRENT_LNO[0]} l{defs.CURRENT_LNO[1]:03}  {' '.join(tokens)}")
 
     new_tree = tree + [tokens[0]]
 
-    if tokens[0] in (defs.NEW_VAR, defs.NEW_VAR_STATIC):
+    if tokens[0] in (conf.NEW_VAR, conf.NEW_VAR_STATIC):
         def_char = tokens[0]
         tokens = tokens[1:]
 
@@ -127,11 +129,11 @@ def compile_line(lines: list, labels: tuple, tree: list):
 
             end_brackets = 1 + ptrlvl * 2
             if len(tokens) < end_brackets:
-                utl.say_error(f"Bad pointer declaration\nSyntax example: {def_char} [ptr_name]")
+                utl.say_error("Bad pointer declaration", correct_syntax = f"{def_char} [ptr_name]")
 
             # check for closing brackets
             if ptrlvl and (ptrlvl * ']' != ''.join(tokens[1 + ptrlvl:2 + ptrlvl * 2])):
-                utl.say_error(f"Bad pointer declaration\nSyntax example: {def_char} [ptr_name]")
+                utl.say_error("Bad pointer declaration", correct_syntax = f"{def_char} [ptr_name]")
 
             var_name = tokens[ptrlvl]
 
@@ -142,7 +144,7 @@ def compile_line(lines: list, labels: tuple, tree: list):
             if not utl.is_valid_name(var_name):
                 utl.say_error(f"Invalid variable name: {tokens[ptrlvl]}")
 
-            if def_char == defs.NEW_VAR:
+            if def_char == conf.NEW_VAR:
                 v = defs.variable(var_name, ptrlvl)
                 v.add()
                 # variable will be automaticly added to stack by compile_lines
@@ -164,7 +166,7 @@ def compile_line(lines: list, labels: tuple, tree: list):
             else:
                 if len(tokens) > end_brackets:
                     if tokens[end_brackets] != '=' or len(tokens) != end_brackets + 2 or not utl.is_number(tokens[end_brackets + 1]):
-                        utl.say_error(f"Bad static variable declaration, only const expected\nSyntax example: {tokens[0]} = 123")
+                        utl.say_error(f"Bad static variable declaration, only const expected", correct_syntax = f"{tokens[0]} = 123")
                     val = utl.to_number(tokens[end_brackets + 1])
                 else:
                     val = None
@@ -187,7 +189,7 @@ def compile_line(lines: list, labels: tuple, tree: list):
             return (output, 1)
 
         elif len(tokens) < 3 or tokens[1] != '=':
-            utl.say_error(f"Bad variable assignment\nSyntax example: var_name = 123")
+            utl.say_error("Bad variable assignment", correct_syntax = "var_name = 123")
 
         v = defs.get_variable(tokens[0])
 
@@ -209,7 +211,7 @@ def compile_line(lines: list, labels: tuple, tree: list):
         o, end = op.load_ptraddr(tokens)
 
         if len(tokens) < end + 2 or tokens[end] != '=':
-            utl.say_error(f"Bad pointer assignment\nSyntax example: [ptr_name] = 123")
+            utl.say_error("Bad pointer assignment", correct_syntax = "[ptr_name] = 123")
 
         output.atend(o)
 
@@ -225,7 +227,7 @@ def compile_line(lines: list, labels: tuple, tree: list):
     elif defs.is_func(tokens[0]):
         f = defs.get_func(tokens[0])
         if len(tokens) < 3 or tokens[1] != '(' or tokens[-1] != ')':
-            utl.say_error(f"Bad syntax on function call\nSyntax example: {f.name}({', '.join(['var' + str(i + 1) for i in range(f.argc)])})")
+            utl.say_error("Bad syntax on function call", correct_syntax = f"{f.name}({', '.join(['var' + str(i + 1) for i in range(f.argc)])})")
 
         output.atend(op.call_func(f, tokens[2:-1]))
 
@@ -233,7 +235,7 @@ def compile_line(lines: list, labels: tuple, tree: list):
         o, end = op.load_fieldaddr(tokens)
 
         if len(tokens) < end + 2 or tokens[end] != '=':
-            utl.say_error(f"Bad struct field assignment\nSyntax example: struct_name[address].field_name = 123")
+            utl.say_error("Bad struct field assignment", correct_syntax = "struct_name[address].field_name = 123")
 
         output.atend(o)
 
@@ -248,7 +250,7 @@ def compile_line(lines: list, labels: tuple, tree: list):
 
     elif tokens[0] == "if":
         if len(tokens) < 2:
-            utl.say_error(f"Bad syntax\nSyntax example: if var == 0")
+            utl.say_error("Bad syntax", correct_syntax = "if var == 0")
 
         # reverse polish notation (RPN) expression
         output.atend(op.calculate_rpn(tokens[1:]))
@@ -283,7 +285,7 @@ def compile_line(lines: list, labels: tuple, tree: list):
 
             if next_tokens[0] == "else":
                 if len(next_tokens) != 1:
-                    utl.say_error(f"Unexpected token {next_tokens[1]} after else\nSyntax example: else " + "{ ... }")
+                    utl.say_error(f"Unexpected token {next_tokens[1]} after else", correct_syntax = "else " + "{ ... }")
                 # compile the lines inside the else block
                 tmp = toks.locate_braces(lines, closing_line + 1)
                 inner_output = compile_lines(lines[closing_line + 3:tmp], labels, tree + ["else"])
@@ -295,7 +297,7 @@ def compile_line(lines: list, labels: tuple, tree: list):
             # elif block
 
             if len(next_tokens) < 2:
-                utl.say_error(f"Bad syntax\nSyntax example: elif var == 0")
+                utl.say_error("Bad syntax", correct_syntax = "elif var == 0")
 
             # reverse polish notation (RPN) expression
             output.atend(op.calculate_rpn(next_tokens[1:]))
@@ -331,7 +333,7 @@ def compile_line(lines: list, labels: tuple, tree: list):
 
     elif tokens[0] == "while":
         if len(tokens) < 2:
-            utl.say_error(f"Bad syntax\nSyntax example: while var < 10")
+            utl.say_error("Bad syntax", correct_syntax = "while var < 10")
 
         debut_label = utl.get_new_label()
         fin_label   = utl.get_new_label()
@@ -363,20 +365,20 @@ def compile_line(lines: list, labels: tuple, tree: list):
         # Syntax: for var (debut, fin)
         # debut and fin can be any expression that evaluates to an integer
         if len(tokens) < 5 or tokens[2] != '(' or tokens[-1] != ')':
-            utl.say_error(f"Bad syntax in for loop\nSyntax example: for var (0, 10)")
+            utl.say_error("Bad syntax in for loop", correct_syntax = "for var (0, 10)")
 
         if not defs.is_variable(tokens[1]):
-            utl.say_error(f"For loop variable must be a declared variable: {tokens[1]}\nSyntax example: :var ; for var (0, 10)")
+            utl.say_error(f"For loop variable must be a declared variable: {tokens[1]}", correct_syntax = ":var ; for var (0, 10)")
 
         v = defs.get_variable(tokens[1])
 
         if v.is_static:
-            utl.say_error(f"For loop variable must be a local variable: {tokens[1]}\nSyntax example: :var ; for var (0, 10)")
+            utl.say_error(f"For loop variable must be a local variable: {tokens[1]}", correct_syntax = ":var ; for var (0, 10)")
 
         args = toks.split_func_args(tokens[3:-1])
 
         if len(args) not in (1, 2):
-            utl.say_error(f"Expected 1 or 2 arguments for for loop\nSyntax example: for var (0, 10) OR for var (0)")
+            utl.say_error("Expected 1 or 2 arguments for for loop", correct_syntax = "for var (0, 10) OR for var (0)")
 
         # init the loop variable with the debut value
         fast_assignment = op.fast_assign_var(v, args[0])
@@ -443,7 +445,7 @@ def compile_line(lines: list, labels: tuple, tree: list):
             utl.say_error("Function declaration not allowed inside a block")
 
         if len(tokens) < 4 or tokens[2] != '(' or tokens[-1] != ')':
-            utl.say_error(f"Bad syntax\nSyntax example: {tokens[0]} func_name(arg1, arg2)")
+            utl.say_error("Bad syntax", correct_syntax = f"{tokens[0]} func_name(arg1, arg2)")
 
         if not utl.is_valid_name(tokens[1]):
             utl.say_error(f"Invalid function name: {tokens[1]}")
@@ -456,13 +458,13 @@ def compile_line(lines: list, labels: tuple, tree: list):
 
         for i, e in enumerate(args):
             if len(e) != 1:
-                utl.say_error(f"Bad syntax in arguments\nSyntax example: {tokens[0]} func_name(arg1, arg2)")
+                utl.say_error("Bad syntax in arguments", correct_syntax = f"{tokens[0]} func_name(arg1, arg2)")
             if not utl.is_valid_name(e[0]):
                 utl.say_error(f"Invalid argument name: {e[0]}")
             defs.variable(e[0], 0, i + 1, is_func_arg = True, scope = new_scope).add()
 
         if tokens[0] == "vafunc" and len(args) != 2:
-            utl.say_error("Variable argument function must have 2 arguments (arg count and arg pointer)\nSyntax example: vafunc func_name(argc, argp)")
+            utl.say_error("Variable argument function must have 2 arguments (arg count and arg pointer)", correct_syntax = "vafunc func_name(argc, argp)")
 
         # compile the lines inside the function block
         closing_line = toks.locate_braces(lines)
@@ -485,7 +487,7 @@ def compile_line(lines: list, labels: tuple, tree: list):
 
     elif tokens[0] == "sub":
         if len(tokens) != 1:
-            utl.say_error("Nothing expected after sub keyword\nSyntax example: sub { ... }")
+            utl.say_error("Nothing expected after sub keyword", correct_syntax = "sub { ... }")
 
         # compile the lines inside the sub block
         closing_line = toks.locate_braces(lines)
@@ -511,7 +513,7 @@ def compile_line(lines: list, labels: tuple, tree: list):
 
     elif tokens[0] == "asm":
         if len(tokens) != 1:
-            utl.say_error("Nothing expected after asm keyword\nSyntax example: asm { ... }")
+            utl.say_error("Nothing expected after asm keyword", correct_syntax = "asm { ... }")
 
         # compile the lines inside the sub block
         closing_line = toks.locate_braces(lines)
@@ -522,7 +524,7 @@ def compile_line(lines: list, labels: tuple, tree: list):
 
     elif tokens[0] == "struct":
         if len(tokens) < 2:
-            utl.say_error("Bad syntax\nSyntax example: struct name { ... }")
+            utl.say_error("Bad syntax", correct_syntax = "struct name { ... }")
 
         if not utl.is_valid_name(tokens[1]):
             utl.say_error(f"Invalid struct name: {tokens[1]}")
@@ -540,8 +542,8 @@ def compile_line(lines: list, labels: tuple, tree: list):
         for line in struct_lines:
             defs.CURRENT_LNO, tokens = line
 
-            if len(tokens) < 2 or tokens[0] != defs.NEW_VAR:
-                utl.say_error(f"Bad field declaration in struct\nSyntax example: struct {tokens[1]} {{ {defs.NEW_VAR} field_name }}")
+            if len(tokens) < 2 or tokens[0] != conf.NEW_VAR:
+                utl.say_error("Bad field declaration in struct", correct_syntax = f"struct {tokens[1]} {{ {conf.NEW_VAR} field_name }}")
 
             tokens = tokens[1:]
 
@@ -552,11 +554,11 @@ def compile_line(lines: list, labels: tuple, tree: list):
 
                 end_brackets = 1 + ptrlvl * 2
                 if len(tokens) < end_brackets:
-                    utl.say_error(f"Bad pointer declaration\nSyntax example: {def_char} [ptr_name]")
+                    utl.say_error("Bad pointer declaration", correct_syntax = f"{def_char} [ptr_name]")
 
                 # check for closing brackets
                 if ptrlvl and (ptrlvl * ']' != ''.join(tokens[1 + ptrlvl:2 + ptrlvl * 2])):
-                    utl.say_error(f"Bad pointer declaration\nSyntax example: {def_char} [ptr_name]")
+                    utl.say_error("Bad pointer declaration", correct_syntax = f"{def_char} [ptr_name]")
 
                 field_name = tokens[ptrlvl]
 
@@ -612,8 +614,7 @@ def compile_line(lines: list, labels: tuple, tree: list):
                 (2, 0), (1, 0))
 
     elif tokens[0] in ("else", "elif"):
-        utl.say_error(f"Unexpected {tokens[0]} statement outside of an if block\n" +
-                        "Syntax example: if var == 0 { ... } elif var == 1 { ... } else { ... }")
+        utl.say_error(f"Unexpected {tokens[0]} statement outside of an if block", correct_syntax = "if var == 0 { ... } elif var == 1 { ... } else { ... }")
 
     elif tokens[0] in defs.CHARS_SPE:
         utl.say_error(f"Unexpected character: '{tokens[0]}'")
@@ -624,10 +625,14 @@ def compile_line(lines: list, labels: tuple, tree: list):
     return (output, 1)
 
 
-def compile(lines: str, path: str = None):
+def compile(lines: str, path: str = None, use_header: bool = False):
     blt.add_builtin_functions()
 
-    tokens_lines = toks.tokenize_lines(lines)
+    tokens_lines = toks.tokenize_lines(lines, path)
+
+    if use_header:
+        tokens_lines = toks.tokenize_lines(conf.LLC_HEADER, "(llc_header)") + tokens_lines
+
     tokens_lines = preproc.preprocess(tokens_lines, path if path else "")
 
     output = out.output_code()

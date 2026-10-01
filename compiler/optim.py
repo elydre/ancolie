@@ -103,7 +103,7 @@ class opti_pattern:
 
             output.add(opcode, *args)
 
-        utl.verbose(f"Optimization pattern line {lineno}: {self.name}")
+        utl.verbose(f"Optimization pattern {lineno[0]}:{lineno[1]}: {self.name}")
 
         for instr in output.instructions:
             instr.lineno = lineno

@@ -1,0 +1,9 @@
+#define A 1
+#define B (123)
+#define C(a, b) a b +
+#define D() 4
+
+dump(A)
+dump B
+dump(C(5 5 +, 9) 6 +)
+dump(D())

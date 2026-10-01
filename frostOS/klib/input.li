@@ -33,6 +33,10 @@ func input(buffer, size) {
             return buffer_i
         }
 
+        if chr 0xff00 b& {
+            continue
+        }
+
         if buffer_i size 1 - < {
             [buffer buffer_i +] = chr
             putchar(chr)

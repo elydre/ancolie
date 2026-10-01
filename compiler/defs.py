@@ -180,13 +180,10 @@ MAGIC_NUMBER = 0xF057
 ARCH_VERSION = 0x0100
 
 CHARS_SPE = [",", ".", "(", ")", ":", "=", "{", "}", "[", "]", "&", "$", "!", "//", "' '", "#", "++", "--"]
-CHARS_OPR = ["+", "-", "*", "/", "%", ">>", "<<", "==", "!=", "<", ">", "<=", ">=", "&&", "|"]
+CHARS_OPR = ["+", "-", "*", "/", "%", ">>", "<<", "==", "!=", "<", ">", "<=", ">=", "&&", "|", "b&"]
 CHARS_SPE += CHARS_OPR
 
 KEYWORDS = ["if", "elif", "else", "while", "func", "vafunc", "return", "break", "continue", "for", "sub", "asm", "struct"]
-
-NEW_VAR = ":"
-NEW_VAR_STATIC = "$"
 
 COND_RES_ADDR   = MEMORY_SIZE - 1
 FUNC_RET_ADDR   = MEMORY_SIZE - 2
@@ -196,11 +193,12 @@ STACK_PTR       = MEMORY_SIZE - 4
 STATIC_ADDR     = MEMORY_SIZE - 4 # will be decremented as static variables / strings are added
 STATIC_BYTES    = bytearray()
 
-CURRENT_LNO = 0
+CURRENT_LNO = ("", 0)
 CURRENT_SCOPE = "global"
 
-EXTRAERR = False
-VERBOSE = False
+ARG_EXTRAERR = False
+ARG_COOLERR = True
+ARG_VERBOSE = False
 
 LOCAL_VARS = {}
 STATIC_VARS = {}

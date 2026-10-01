@@ -17,7 +17,9 @@ func shell_help(argc, argv) {
 }
 
 func shell_halt(argc, argv) {
-    halt()
+    asm {
+        hlt
+    }
 }
 
 func shell_echo(argc, argv) {
@@ -62,7 +64,7 @@ func shell_color(argc, argv) {
 
 func interpret(buffer) {
     : arg_count
-    : args i
+    : args
 
     arg_count = strsplit_count(buffer, ' ')
 

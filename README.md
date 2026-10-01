@@ -41,7 +41,7 @@ gcc -DGUI -o emulator emulator.c -lSDL2
 - [x] variable arguments function
 - [x] asm statements
 - [x] structs
-- [ ] preprocessor *- in progress*
+- [x] preprocessor
 - [ ] heap arrays
 - [ ] multiple source files
 
@@ -160,7 +160,7 @@ asm {
         mov [sp], &out  // copy `out` to the stack
         gt [sp], 10     // compare the value of `out` with 10
         jmp loop, [sp]  // if `out` is less than 10, jump to loop
-    
+
     pop 0               // restore the stack
 }
 ```
@@ -172,14 +172,11 @@ asm {
 | `addr = alloca(size)`     | allocate `size` bytes on the stack and return a pointer to it |
 | `addr = array(...)`       | allocate an array in the stack and return a pointer to it     |
 | `size = sizeof(struct)`   | return the size of a struct in bytes                    |
-| `out(port, val)`          | output `val` to `port`                                  |      
+| `out(port, val)`          | output `val` to `port`                                  |
 | `val = in(port)`          | return the value from `port`                            |
 | `dump(num)`               | print the decimal value of `num` to the emulator stdout |
 | `memset(addr, val, size)` | set `size` bytes of memory at `addr` to `val`           |
 | `memmov(dest, src, size)` | copy `size` bytes from `src` to `dest`                  |
-| `halt()`                  | halt the computer                                       |
-| `addr = _get_sp()`        | return the current stack pointer                        |
-| `addr = _get_screen()`    | return the address of the screen memory (`0xF830`)      |
 
 ## Computer architecture
 
@@ -261,7 +258,7 @@ each argument can be one of the following:
 | **debug**    | -         | -                                              |
 | `0x1000`     | out       | print hexadecimal value (emulator stdout)      |
 | `0x1001`     | out       | print decimal value (emulator stdout)          |
-| `0x1002`     | out       | print character (emulator stdout)              |      
+| `0x1002`     | out       | print character (emulator stdout)              |
 | **keyboard** | -         | -                                              |
 | `0x1010`     | in        | get kb state (0 noting, 1 pressed, 2 released) |
 | `0x1011`     | in        | get kb char and pop it from the buffer         |

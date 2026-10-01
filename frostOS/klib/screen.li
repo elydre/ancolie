@@ -4,7 +4,7 @@ func screen_flush() {
 }
 
 func screen_clear() {
-    memset(screen, ' ', 80 25 *)
+    memset(_lSCREEN, ' ', 80 25 *)
     screen_x = 0
     screen_y = 0
 }
@@ -23,7 +23,7 @@ func putchar(c) {
         if screen_x 0 > {
             screen_x--
         }
-        [screen 80 screen_y * + screen_x +] = ' '
+        [_lSCREEN 80 screen_y * + screen_x +] = ' '
         return
     }
     if screen_x 79 > {
@@ -31,11 +31,11 @@ func putchar(c) {
         screen_y++
     }
     if screen_y 24 > {
-        memmov(screen, screen 80 +, 80 24 *)
-        memset(screen 80 24 * +, ' ', 80)
+        memmov(_lSCREEN, _lSCREEN 80 +, 80 24 *)
+        memset(_lSCREEN 80 24 * +, ' ', 80)
         screen_y = 24
     }
-    [screen 80 screen_y * + screen_x +] = c screen_color |
+    [_lSCREEN 80 screen_y * + screen_x +] = c screen_color |
     screen_x++
 }
 

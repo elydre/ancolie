@@ -76,7 +76,7 @@ def tokenize_line(line: str):
 
     return lines
 
-def tokenize_lines(lines: str):
+def tokenize_lines(lines: str, filename: str):
     tokens_lines = []
 
     for lno, line in enumerate(lines.splitlines(), start=1):
@@ -84,7 +84,7 @@ def tokenize_lines(lines: str):
 
         line = line.strip()
         for t in tokenize_line(line):
-            tokens_lines.append((lno, t))
+            tokens_lines.append(((filename, lno), t))
 
     return tokens_lines
 

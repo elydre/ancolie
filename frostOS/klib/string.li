@@ -44,7 +44,7 @@ func strsplit_count(buffer, delimiter) {
 }
 
 func strsplit(buffer, args) {
-    : arg_count tmp
+    : arg_count
 
     while [buffer] ' ' == {
         buffer++

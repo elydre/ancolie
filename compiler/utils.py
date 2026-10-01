@@ -1,6 +1,7 @@
 import compiler.defs as defs
 
 import ctypes
+import sys
 
 char_escape_dict = {
     "\\n": 10,
@@ -12,24 +13,36 @@ char_escape_dict = {
     "\\\\": 92
 }
 
-def say_error(message, internal=False):
+def say_error(message, correct_syntax = None, internal=False, extra=False):
+    if extra and not defs.ARG_EXTRAERR:
+        return
+    
+    line_name = f"{defs.CURRENT_LNO[0]}:{defs.CURRENT_LNO[1]}"
+
+    error_name = ""
+    if extra:
+        error_name = "extra "
     if internal:
-        print(end = "Internal ")
-    print(f"Error line {defs.CURRENT_LNO}: {message}")
+        error_name += "internal "
+    error_name += "error"
+
+    if sys.stderr.isatty() and defs.ARG_COOLERR:
+        error_name = f"\033[1;91m( {error_name} )\033[0m"
+        message = f"\033[1m{message}\033[0m"
+        if correct_syntax:
+            message += f"\n\033[32m// correct syntax: {correct_syntax}\033[0m"
+        print(f"{error_name} {line_name} >> {message}", file=sys.stderr)
+    else:
+        print(f"{line_name}: {error_name}: {message}", file=sys.stderr)
+
 
     if internal:
         raise Exception(message)
 
     exit(1)
 
-def say_extra_error(message):
-    if not defs.EXTRAERR:
-        return
-    print(f"Extra Error line {defs.CURRENT_LNO}: {message}")
-    exit(1)
-
 def verbose(message):
-    if not defs.VERBOSE:
+    if not defs.ARG_VERBOSE:
         return
     print(message)
 

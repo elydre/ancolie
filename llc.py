@@ -10,16 +10,21 @@ import argparse
 
 parser = argparse.ArgumentParser(description="Ancolie Compiler")
 
-parser.add_argument("input_file",           help="Input file to compile",  type=str)
+parser.add_argument("input_file",           help="Input file to compile", type=str)
+parser.add_argument("-o", "--ofile",        help="Output file name",      default="output.bin", dest="output_file")
+
 parser.add_argument("-a", "--dump-asm",     help="Dump assembly code to stdout", action="store_true", dest="dump_asm")
-parser.add_argument("-o", "--output",       help="Output file name",       default="output.bin", dest="output_file")
-parser.add_argument("-n", "--no-opti",      help="Disable optimizations",  action="store_true",  dest="no_opti")
-parser.add_argument("-v", "--verbose",      help="Verbose output",         action="store_true",  dest="verbose")
-parser.add_argument("-x", "--extra-errors", help="Add boring code checks", action="store_true",  dest="extra_err")
+parser.add_argument("-v", "--verbose",      help="Verbose output",               action="store_true", dest="verbose")
+parser.add_argument("-x", "--extra-errors", help="Add boring code checks",       action="store_true", dest="extra_err")
+
+parser.add_argument("-n", "--no-opti",      help="Disable optimizations",            action="store_true", dest="no_opti")
+parser.add_argument("-r", "--no-header",    help="Disable compiler built-in header", action="store_true", dest="no_header")
+parser.add_argument("-e", "--no-color",     help="Disable colored error messages",   action="store_true", dest="no_coolerr")
 args = parser.parse_args()
 
-defs.EXTRAERR = args.extra_err
-defs.VERBOSE  = args.verbose
+defs.ARG_EXTRAERR = args.extra_err
+defs.ARG_VERBOSE  = args.verbose
+defs.ARG_COOLERR  = not args.no_coolerr
 
 try:
     with open(args.input_file, "r") as ifile:
@@ -27,7 +32,7 @@ try:
 except FileNotFoundError:
     exit(f"Could not open input file: {args.input_file}")
 
-main_output = compile(lines, args.input_file)
+main_output = compile(lines, args.input_file, not args.no_header)
 
 if not args.no_opti:
     main_output = optimize(main_output)

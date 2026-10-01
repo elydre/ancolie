@@ -39,7 +39,7 @@ def calculate_rpn(rpn: list):
         utl.say_error("Empty RPN expression")
 
     if len(rpn) > 2 and rpn[0] == '(' and rpn[-1] == ')':
-        utl.say_extra_error("Unnecessary parentheses in RPN expression")
+        utl.say_error("Unnecessary parentheses in RPN expression", extra=True)
         rpn = rpn[1:-1]
 
     stack_size = 0
@@ -85,7 +85,7 @@ def calculate_rpn(rpn: list):
             continue
 
         elif have_ampersand:
-            utl.say_error(f"Unexpected '&' before token: {token}\nCorrect syntax example: ptr = &var")
+            utl.say_error(f"Unexpected '&' before token: {token}", correct_syntax = "ptr = &var")
 
         if token == '[':
             o, end = op.load_ptraddr(rpn[i:])
@@ -124,7 +124,7 @@ def calculate_rpn(rpn: list):
                         skip_to = i + 2 + j
                         break
             else:
-                utl.say_error(f"Unclosed parenthesis in function call\nSyntax example: func_name(var1, var2)")
+                utl.say_error("Unclosed parenthesis in function call", correct_syntax = "func_name(var1, var2)")
 
             f = defs.get_func(token)
             if not f.does_return:
@@ -196,6 +196,8 @@ def calculate_rpn(rpn: list):
                 output.add("and", a, b)
             elif token == '|':
                 output.add("bor", a, b)
+            elif token == 'b&':
+                output.add("band", a, b)
             elif token == '>>':
                 if tmp_number is None:
                     utl.say_error(f"Bitshift operator requires a number as second operand")
@@ -293,7 +295,7 @@ def load_ptraddr(tokens: list):
                 end += i
                 break
     else:
-        utl.say_error(f"Unclosed brackets in pointer access\nSyntax example: [ptr]")
+        utl.say_error("Unclosed brackets in pointer access", correct_syntax = "[ptr]")
 
     output.atend(op.calculate_rpn(tokens[1:end]))
     return (output, end + 1)
@@ -305,7 +307,7 @@ def load_fieldaddr(tokens: list):
     struct = defs.get_struct(tokens[0])
     
     if len(tokens) < 4 or tokens[1] != "[":
-        utl.say_error(f"Missing brackets in struct access\nSyntax example: struct_name[address].field_name")
+        utl.say_error("Missing brackets in struct access", correct_syntax = "struct_name[address].field_name")
 
     # find the closing bracket and send to RPN calculator
 
@@ -321,12 +323,12 @@ def load_fieldaddr(tokens: list):
                 end += i + 1
                 break
     else:
-        utl.say_error(f"Unclosed brackets in struct access\nSyntax example: struct_name[address].field_name")
+        utl.say_error("Unclosed brackets in struct access", correct_syntax = "struct_name[address].field_name")
 
     output.atend(op.calculate_rpn(tokens[2:end]))
 
     if tokens[end + 1] != ".":
-        utl.say_error(f"Missing dot in struct access\nSyntax example: struct_name[address].field_name")
+        utl.say_error("Missing dot in struct access", correct_syntax = "struct_name[address].field_name")
 
     field = struct.get_field(tokens[end + 2])
 
@@ -343,7 +345,7 @@ def call_func(f: defs.func, tokens: list):
     args = toks.split_func_args(tokens)
 
     if not f.is_vaargs and len(args) != f.argc:
-        utl.say_error(f"Wrong number of arguments for function {f.name}\nSyntax example: {f.name}({', '.join(['var' + str(i + 1) for i in range(f.argc)])})")
+        utl.say_error(f"Wrong number of arguments for function {f.name}", correct_syntax = f"{f.name}({', '.join(['var' + str(i + 1) for i in range(f.argc)])})")
 
     if f.is_builtin:
         return f.blt_handler(args)
