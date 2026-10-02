@@ -32,62 +32,165 @@ def fini():
 
     return output
 
-def calculate_rpn(rpn: list):
+def validate_expression(tokens: list):
+    if not tokens:
+        utl.say_error("Empty expression")
+
+    previous = "("
+    i = 0
+
+    while i < len(tokens):
+        token = tokens[i]
+
+        print(f"Validating token: {token}, previous: {previous}")
+
+        if token in defs.CHARS_OPR:
+            if previous in ("operator", "(") and token != "&":
+                utl.say_error(f"Missing value before operator '{token}'")
+
+            if token == "&" and previous not in ("operator", "("):
+                utl.say_error(f"Unexpected '&' operator without a variable")
+
+            if i == len(tokens) - 1 and token not in ("++", "--"):
+                utl.say_error(f"Operator at the end of expression '{token}'")
+
+            if token in ("++", "--"):
+                if previous != "operand":
+                    utl.say_error(f"Unexpected '{token}' operator without a variable")
+            else:        
+                previous = "operator"
+
+        elif token == "(":
+            if previous == "operand":
+                utl.say_error("Missing operator before opening parenthesis")
+            previous = "("
+
+        elif token == ")":
+            if previous in ("operator", "("):
+                utl.say_error("Missing value before closing parenthesis")
+            previous = "operand"
+
+        else:
+            if previous == "operand":
+                utl.say_error(f"Missing operator before value '{token}'")
+            previous = "operand"
+
+            if len(tokens) > i + 1 and tokens[i + 1] == "(" and defs.is_func(token):
+                close_paren = toks.find_closing_paren(tokens, i + 1)
+                if close_paren == -1:
+                    utl.say_error("Unclosed parenthesis in function call", correct_syntax = "func_name(var1, var2)")
+                i = close_paren
+
+        i += 1
+
+
+def infix_to_rpn(tokens: list):
+    validate_expression(tokens)
+
+    stack = []
+    rpn = []
+
+    i = 0
+    while i < len(tokens):
+        token = tokens[i]
+
+        if token in defs.CHARS_OPR:
+            while (stack and stack[-1] != '(' and
+                     defs.get_operator_priority(stack[-1]) >= defs.get_operator_priority(token)):
+                rpn.append(stack.pop())
+            stack.append(token)
+        elif token == '(':
+            stack.append(token)
+        elif token == ')':
+            while stack and stack[-1] != '(':
+                rpn.append(stack.pop())
+            if not stack:
+                utl.say_error("Too many closing parentheses in expression")
+            stack.pop()  # pop the '('
+        else:
+            if i + 1 < len(tokens) and tokens[i + 1] == '(' and defs.is_func(token):
+                close_paren = toks.find_closing_paren(tokens, i + 1)
+                if close_paren == -1:
+                    utl.say_error("Unclosed parenthesis in function call", correct_syntax = "func_name(var1, var2)")
+                rpn.extend(tokens[i:close_paren + 1])
+                i = close_paren
+            else:
+                rpn.append(token)
+
+        i += 1
+
+    while stack:
+        if stack[-1] == '(':
+            utl.say_error("Too many opening parentheses in expression")
+        rpn.append(stack.pop())
+
+    return rpn
+
+def calculate_rpn(rpn: list, is_infix: bool = True):
     output = out.output_code()
 
-    if not rpn:
-        utl.say_error("Empty RPN expression")
-
-    if len(rpn) > 2 and rpn[0] == '(' and rpn[-1] == ')':
+    if len(rpn) > 1 and rpn[0] == '(' and toks.find_closing_paren(rpn, 0) == len(rpn) - 1:
         utl.say_error("Unnecessary parentheses in RPN expression", extra=True)
         rpn = rpn[1:-1]
 
+    if len(rpn) == 0:
+        utl.say_error("Empty expression")
+
+    if is_infix:
+        print(rpn)
+        rpn = infix_to_rpn(rpn)
+        print(rpn)
+
     stack_size = 0
-    have_ampersand = False
 
     skip_to = 0
     tmp_number = None
+
+    last_variable = None
 
     for i, token in enumerate(rpn):
         if i < skip_to:
             continue
 
-        if token == '&':
-            have_ampersand = True
-            continue
+        if last_variable is not None:
+            finish = False
+        
+            if last_variable.is_static:
+                output.add("push",
+                        (0, last_variable.addr))
+            else:
+                output.add("push",
+                    (3, utl.to_u16(-last_variable.offset)))
 
-        if defs.is_variable(token):
-            v = defs.get_variable(token)
-            if have_ampersand:
-                if v.is_static:
+            if token == '&':
+                if last_variable.is_static:
                     output.add("push",
-                            (1, v.addr))
+                            (1, last_variable.addr))
                 else:
                     output.add("push",
                             (0, defs.STACK_DEBUT_PTR))
                     output.add("add",
-                            (2, 0), (1, utl.to_u16(-v.offset)))
-                have_ampersand = False
-            else:
-                if v.is_static:
-                    output.add("push",
-                            (0, v.addr))
-                else:
-                    output.add("push",
-                        (3, utl.to_u16(-v.offset)))
-
-                if len(rpn) > i + 1 and rpn[i + 1] in ("++", "--"):
-                    output.add("add" if rpn[i + 1] == "++" else "sub",
-                            (0, v.addr) if v.is_static else (3, utl.to_u16(-v.offset)), (1, 1))
-                    skip_to = i + 2
-
+                            (2, 0), (1, utl.to_u16(-last_variable.offset)))
+                finish = True
+                    
+            elif token in ("++", "--"):
+                output.add("add" if token == "++" else "sub",
+                        (0, last_variable.addr) if last_variable.is_static else (3, utl.to_u16(-last_variable.offset)), (1, 1))
+                finish = True
+            
             stack_size += 1
+        
+            if finish:
+                last_variable = None
+                continue
+        
+        last_variable = None
+        
+        if defs.is_variable(token):
+            last_variable = defs.get_variable(token)
             continue
 
-        elif have_ampersand:
-            utl.say_error(f"Unexpected '&' before token: {token}", correct_syntax = "ptr = &var")
-
-        if token == '[':
+        elif token == '[':
             o, end = op.load_ptraddr(rpn[i:])
             skip_to = i + end
             output.atend(o)
@@ -114,27 +217,22 @@ def calculate_rpn(rpn: list):
             stack_size += 1
 
         elif defs.is_func(token):
-            open_parens = 1
-            for j, t in enumerate(rpn[i + 2:]):
-                if t == '(':
-                    open_parens += 1
-                elif t == ')':
-                    open_parens -= 1
-                    if open_parens == 0:
-                        skip_to = i + 2 + j
-                        break
-            else:
-                utl.say_error("Unclosed parenthesis in function call", correct_syntax = "func_name(var1, var2)")
-
             f = defs.get_func(token)
             if not f.does_return:
-                utl.say_error(f"Function {f.name} does not return a value, cannot use in RPN expression")
+                utl.say_error(f"Function {f.name} does not return a value, cannot use in expression")
 
             if f.no_rpn:
-                utl.say_error(f"Function {f.name} cannot be used in RPN expressions")
+                utl.say_error(f"Function {f.name} cannot be used in expressions")
 
-            output.atend(op.call_func(f, rpn[i + 2:skip_to]))
-            skip_to += 1
+            if len(rpn) < i + 2 or rpn[i + 1] != '(':
+                utl.say_error(f"Function {token} must be called with parentheses", correct_syntax = f"{token}(arg1, arg2)")
+
+            end = toks.find_closing_paren(rpn, i + 1)
+            if end == -1:
+                utl.say_error("Unclosed parenthesis in function call", correct_syntax = f"{token}(arg1, arg2)")
+
+            output.atend(op.call_func(f, rpn[i + 2:end]))
+            skip_to = end + 1
 
             # push the return value to the stack if the function returns a value
             output.add("push",
@@ -194,9 +292,9 @@ def calculate_rpn(rpn: list):
                 output.add("gte", a, b)
             elif token == '&&':
                 output.add("and", a, b)
-            elif token == '|':
+            elif token == '|b':
                 output.add("bor", a, b)
-            elif token == 'b&':
+            elif token == '&b':
                 output.add("band", a, b)
             elif token == '>>':
                 if tmp_number is None:
@@ -207,7 +305,7 @@ def calculate_rpn(rpn: list):
                     utl.say_error(f"Bitshift operator requires a number as second operand")
                 output.add("mul", a, (1, 2 ** tmp_number))
             else:
-                utl.say_error(f"Unknown operator in RPN expression: {token}", internal=True)
+                utl.say_error(f"Unknown operator in expression: {token}", internal=True)
 
             if tmp_number is None:
                 output.add("pop",
@@ -216,16 +314,13 @@ def calculate_rpn(rpn: list):
                 tmp_number = None
 
         else:
-            utl.say_error(f"Unknown token in RPN expression: {token}")
+            utl.say_error(f"Unknown token in expression: {token}")
 
         if stack_size < 1:
-            utl.say_error("Invalid RPN expression: not enough values on the stack")
-
-    if have_ampersand:
-        utl.say_error("Invalid RPN expression: unexpected '&' at the end of the expression")
+            utl.say_error("Invalid RPN expression: not enough values on the stack", internal=is_infix)
 
     if stack_size > 1:
-        utl.say_error("Invalid RPN expression: too many values on the stack after evaluation")
+        utl.say_error("Invalid RPN expression: too many values on the stack after evaluation", internal=is_infix)
 
     return output
 

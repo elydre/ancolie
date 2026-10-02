@@ -110,6 +110,17 @@ def locate_braces(lines: list, current_line: int = 0):
 
     return closing_line
 
+def find_closing_paren(tokens: list, start_index: int):
+    opening_parens = 1
+    for i in range(start_index + 1, len(tokens)):
+        if tokens[i] == '(':
+            opening_parens += 1
+        elif tokens[i] == ')':
+            opening_parens -= 1
+            if opening_parens == 0:
+                return i
+    return -1
+
 def split_func_args(tokens: list):
     args = []
     current_arg = []

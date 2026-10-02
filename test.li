@@ -1,0 +1,9 @@
+func test(a) {
+    return a * 2
+}
+
+: a = 5
+
+dump(2 + &a)
+dump(2 + &a + 1)
+dump(2 + (3 + 5) + a++ + 1)

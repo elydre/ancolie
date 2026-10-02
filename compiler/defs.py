@@ -174,13 +174,49 @@ OPCODES = [
     opcode("hlt",    0xFF, 0),
 ]
 
+class opr:
+    def __init__(self, name, level):
+        self.name = name
+        self.level = level
+
+OPERATORS = [
+    opr("++", 8),
+    opr("--", 8),
+    opr("&", 8),
+
+    opr("*", 7),
+    opr("/", 7),
+    opr("%", 7),
+    opr("+", 6),
+    opr("-", 6),
+
+    opr("<<", 5),
+    opr(">>", 5),
+    opr("&b", 4),
+    opr("|b", 4),
+    opr("&&", 3),
+
+    opr("<",  2),
+    opr(">",  2),
+    opr("<=", 2),
+    opr(">=", 2),
+    opr("==", 1),
+    opr("!=", 1),
+]
+
+def get_operator_priority(opr):
+    for e in OPERATORS:
+        if e.name == opr:
+            return e.level
+    utl.say_error(f"Unknown operator: {opr}", internal=True)
+
 MEMORY_SIZE = 65536 - (80 * 25)
 
 MAGIC_NUMBER = 0xF057
 ARCH_VERSION = 0x0100
 
-CHARS_SPE = [",", ".", "(", ")", ":", "=", "{", "}", "[", "]", "&", "$", "!", "//", "' '", "#", "++", "--"]
-CHARS_OPR = ["+", "-", "*", "/", "%", ">>", "<<", "==", "!=", "<", ">", "<=", ">=", "&&", "|", "b&"]
+CHARS_SPE = [",", ".", "(", ")", ":", "=", "{", "}", "[", "]", "$", "!", "//", "' '", "#"]
+CHARS_OPR = [e.name for e in OPERATORS]
 CHARS_SPE += CHARS_OPR
 
 KEYWORDS = ["if", "elif", "else", "while", "func", "vafunc", "return", "break", "continue", "for", "sub", "asm", "struct"]
