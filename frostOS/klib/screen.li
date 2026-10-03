@@ -1,50 +1,50 @@
 func screen_flush() {
-    out(0x1021, screen_y 80 * screen_x +)
+    out(0x1021, screen_y * 80 + screen_x)
     out(0x1020, 0)
 }
 
 func screen_clear() {
-    memset(_lSCREEN, ' ', 80 25 *)
+    memset(_lSCREEN, ' ', 80 * 25)
     screen_x = 0
     screen_y = 0
 }
 
 func putchar(c) {
-    if c '\n' == {
+    if c == '\n' {
         screen_x = 0
         screen_y++
         return
     }
-    if c '\r' == {
+    if c == '\r' {
         screen_x = 0
         return
     }
-    if c '\b' == {
-        if screen_x 0 > {
+    if c == '\b' {
+        if screen_x > 0 {
             screen_x--
         }
-        [_lSCREEN 80 screen_y * + screen_x +] = ' '
+        [_lSCREEN + (80 * screen_y + screen_x)] = ' '
         return
     }
-    if screen_x 79 > {
+    if screen_x > 79 {
         screen_x = 0
         screen_y++
     }
-    if screen_y 24 > {
-        memmov(_lSCREEN, _lSCREEN 80 +, 80 24 *)
-        memset(_lSCREEN 80 24 * +, ' ', 80)
+    if screen_y > 24 {
+        memmov(_lSCREEN, _lSCREEN + 80, 80 * 24)
+        memset(_lSCREEN + (80 * 24), ' ', 80)
         screen_y = 24
     }
-    [_lSCREEN 80 screen_y * + screen_x +] = c screen_color |
+    [_lSCREEN + (80 * screen_y) + screen_x] = c |b screen_color
     screen_x++
 }
 
 func putnbr(n) {
-    if n 9 > {
-        putnbr(n 10 /)
+    if n > 9 {
+        putnbr(n / 10)
     }
 
-    putchar(n 10 % '0' +)
+    putchar(n % 10 + '0')
 }
 
 func puthex(n) {
@@ -52,19 +52,19 @@ func puthex(n) {
 
     base = "0123456789ABCDEF"
 
-    if n 15 > {
-        puthex(n 16 /)
+    if n > 15 {
+        puthex(n / 16)
     }
 
-    putchar([base n 16 % +])
+    putchar([base + n % 16])
 }
 
 func print(str) {
     : i c
 
     for i (0) {
-        c = [str i +]
-        if c 0 == {
+        c = [str + i]
+        if c == 0 {
             break
         }
         putchar(c)
@@ -79,19 +79,19 @@ func screen_mk_color(str) {
     color = 0
 
     for i (0, 2) {
-        c = [str i +]
-        if c '0' >= c '9' <= && {
-            color = color 16 * c '0' - +
-        } elif c 'A' >= c 'F' <= && {
-            color = color 16 * c 55 - +
-        } elif c 'a' >= c 'f' <= && {
-            color = color 16 * c 87 - +
+        c = [str + i]
+        if c >= '0' && c <= '9' {
+            color = color * 16 + (c - '0')
+        } elif c >= 'A' && c <= 'F' {
+            color = color * 16 + (c - 55)
+        } elif c >= 'a' && c <= 'f' {
+            color = color * 16 + (c - 87)
         } else {
             return 1
         }
     }
 
-    return color 8 <<
+    return color << 8
 }
 
 vafunc printf(argc, argp) {
@@ -100,47 +100,47 @@ vafunc printf(argc, argp) {
     str = [argp]
 
     for i (0) {
-        c = [str i +]
-        if c 0 == {
+        c = [str + i]
+        if c == 0 {
             break
         }
-        if c '%' == {
+        if c == '%' {
             i++
-            c = [str i +]
-            if c '%' == {
+            c = [str + i]
+            if c == '%' {
                 putchar('%')
                 continue
             }
             argp++
             argc--
-            if argc 0 == {
+            if argc == 0 {
                 print("\n[printf not enough arguments]\n")
                 return
             }
-            if c 'd' == {
+            if c == 'd' {
                 putnbr([argp])
             }
-            elif c 'x' == {
+            elif c == 'x' {
                 putchar('0')
                 putchar('x')
                 puthex([argp])
             }
-            elif c 's' == {
+            elif c == 's' {
                 print([argp])
             }
-            elif c 'c' == {
+            elif c == 'c' {
                 putchar([argp])
             }
             continue
         }
-        if c '$' == {
+        if c == '$' {
             i++
-            if [str i +] '$' == {
+            if [str + i] == '$' {
                 putchar('$')
                 continue
             }
-            c = screen_mk_color(str i +)
-            if c 1 == {
+            c = screen_mk_color(str + i)
+            if c == 1 {
                 print("\n[printf invalid color]\n")
                 return
             }

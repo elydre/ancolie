@@ -88,7 +88,7 @@ def tokenize_lines(lines: str, filename: str):
 
     return tokens_lines
 
-def locate_braces(lines: list, current_line: int = 0):
+def locate_braces(lines, current_line: int = 0):
      # find the opening brace '{'
     if current_line + 1 >= len(lines) or lines[current_line + 1][1] != ['{']:
         utl.say_error("Bad syntax\nExpected '{' after 'if' statement")
@@ -110,7 +110,20 @@ def locate_braces(lines: list, current_line: int = 0):
 
     return closing_line
 
-def split_func_args(tokens: list):
+def find_closing_paren(tokens, start_index: int, chars: tuple = ('(', ')'), default = -1):
+    opening_parens = 1
+
+    for i in range(start_index + 1, len(tokens)):
+        if tokens[i] == chars[0]:
+            opening_parens += 1
+        elif tokens[i] == chars[1]:
+            opening_parens -= 1
+            if opening_parens == 0:
+                return i
+
+    return default
+
+def split_func_args(tokens):
     args = []
     current_arg = []
     opening_brackets = 0

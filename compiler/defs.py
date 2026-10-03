@@ -174,13 +174,50 @@ OPCODES = [
     opcode("hlt",    0xFF, 0),
 ]
 
+class opr:
+    def __init__(self, name, level):
+        self.name = name
+        self.level = level
+
+OPERATORS = [
+    opr("++", 8),
+    opr("--", 8),
+    opr("&", 8),
+
+    opr("*", 7),
+    opr("/", 7),
+    opr("%", 7),
+    opr("+", 6),
+    opr("-", 6),
+
+    opr("<<", 5),
+    opr(">>", 5),
+    opr("&b", 4),
+    opr("|b", 4),
+
+    opr("<",  3),
+    opr(">",  3),
+    opr("<=", 3),
+    opr(">=", 3),
+    opr("==", 2),
+    opr("!=", 2),
+
+    opr("&&", 1),
+]
+
+def get_operator(opr):
+    for e in OPERATORS:
+        if e.name == opr:
+            return e
+    utl.say_error(f"Unknown operator: {opr}", internal=True)
+
 MEMORY_SIZE = 65536 - (80 * 25)
 
 MAGIC_NUMBER = 0xF057
 ARCH_VERSION = 0x0100
 
-CHARS_SPE = [",", ".", "(", ")", ":", "=", "{", "}", "[", "]", "&", "$", "!", "//", "' '", "#", "++", "--"]
-CHARS_OPR = ["+", "-", "*", "/", "%", ">>", "<<", "==", "!=", "<", ">", "<=", ">=", "&&", "|", "b&"]
+CHARS_SPE = [",", ".", "(", ")", ":", "=", "{", "}", "[", "]", "$", "!", "//", "' '", "#"]
+CHARS_OPR = [e.name for e in OPERATORS]
 CHARS_SPE += CHARS_OPR
 
 KEYWORDS = ["if", "elif", "else", "while", "func", "vafunc", "return", "break", "continue", "for", "sub", "asm", "struct"]
@@ -193,17 +230,19 @@ STACK_PTR       = MEMORY_SIZE - 4
 STATIC_ADDR     = MEMORY_SIZE - 4 # will be decremented as static variables / strings are added
 STATIC_BYTES    = bytearray()
 
-CURRENT_LNO = ("", 0)
 CURRENT_SCOPE = "global"
+CURRENT_LNO   = ("", 0)
 
 ARG_EXTRAERR = False
-ARG_COOLERR = True
-ARG_VERBOSE = False
+ARG_COOLERR  = True
+ARG_VERBOSE  = False
+ARG_OPTI     = True
+ARG_RPN      = False
 
-LOCAL_VARS = {}
+LOCAL_VARS  = {}
 STATIC_VARS = {}
 
-ALL_FUNCS = []
+ALL_FUNCS   = []
 ALL_STRUCTS = []
 
 DATA_SEQ = []

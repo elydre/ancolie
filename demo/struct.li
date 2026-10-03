@@ -15,14 +15,14 @@ dump(elm[e].value)
 
 : list i
 
-list = alloca(sizeof(elm) 10 *)
+list = alloca(sizeof(elm) * 10)
 
 for i (0, 10) {
-    : offset = sizeof(elm) i *
-    elm[list offset +].name = "test"
-    elm[list offset +].value = i
+    : offset = sizeof(elm) * i
+    elm[list + offset].name = "test"
+    elm[list + offset].value = i
 }
 
 for i (0, 10) {
-    dump(elm[list sizeof(elm) i * +].value)
+    dump(elm[list + sizeof(elm) * i].value)
 }

@@ -157,7 +157,7 @@ def compile_line(lines: list, labels: tuple, tree: list):
                         break
 
                     # reverse polish notation (RPN) expression
-                    output.atend(op.calculate_rpn(tokens[end_brackets + 1:]))
+                    output.atend(op.calculate_expr(tokens[end_brackets + 1:]))
 
                     # move the result from the stack to the variable's memory location
                     output.add("pop", (3, utl.to_u16(-v.offset)))
@@ -199,7 +199,7 @@ def compile_line(lines: list, labels: tuple, tree: list):
             output.atend(fast_assignment)
         else:
             # reverse polish notation (RPN) expression
-            output.atend(op.calculate_rpn(tokens[2:]))
+            output.atend(op.calculate_expr(tokens[2:]))
 
             # move the result from the stack to the variable's memory location
             if v.is_static:
@@ -216,7 +216,7 @@ def compile_line(lines: list, labels: tuple, tree: list):
         output.atend(o)
 
         # reverse polish notation (RPN) expression
-        output.atend(op.calculate_rpn(tokens[end + 1:]))
+        output.atend(op.calculate_expr(tokens[end + 1:]))
 
         # pop the result from the stack to the pointer's memory location
         output.add("pops", (2, 1), (1, 0))
@@ -240,7 +240,7 @@ def compile_line(lines: list, labels: tuple, tree: list):
         output.atend(o)
 
         # reverse polish notation (RPN) expression
-        output.atend(op.calculate_rpn(tokens[end + 1:]))
+        output.atend(op.calculate_expr(tokens[end + 1:]))
 
         # pop the result from the stack to the pointer's memory location
         output.add("pops", (2, 1), (1, 0))
@@ -253,7 +253,7 @@ def compile_line(lines: list, labels: tuple, tree: list):
             utl.say_error("Bad syntax", correct_syntax = "if var == 0")
 
         # reverse polish notation (RPN) expression
-        output.atend(op.calculate_rpn(tokens[1:]))
+        output.atend(op.calculate_expr(tokens[1:]))
 
         # pop the result from the stack to the conditional result memory location
         output.add("pop",
@@ -300,7 +300,7 @@ def compile_line(lines: list, labels: tuple, tree: list):
                 utl.say_error("Bad syntax", correct_syntax = "elif var == 0")
 
             # reverse polish notation (RPN) expression
-            output.atend(op.calculate_rpn(next_tokens[1:]))
+            output.atend(op.calculate_expr(next_tokens[1:]))
 
             # pop the result from the stack to the conditional result memory location
             output.add("pop",
@@ -340,7 +340,7 @@ def compile_line(lines: list, labels: tuple, tree: list):
 
         # reverse polish notation (RPN) expression
         output.add_label(debut_label)
-        output.atend(op.calculate_rpn(tokens[1:]))
+        output.atend(op.calculate_expr(tokens[1:]))
 
         # pop the result from the stack to the conditional result memory location
         output.add("pop",
@@ -386,7 +386,7 @@ def compile_line(lines: list, labels: tuple, tree: list):
         if fast_assignment:
             output.atend(fast_assignment)
         else:
-            output.atend(op.calculate_rpn(args[0]))
+            output.atend(op.calculate_expr(args[0]))
 
             # move the result from the stack to the variable's memory location
             output.add("pop",
@@ -398,7 +398,7 @@ def compile_line(lines: list, labels: tuple, tree: list):
 
         if len(args) == 2:
             # push the loop fin value onto the stack
-            output.atend(op.calculate_rpn(args[1]))
+            output.atend(op.calculate_expr(args[1]))
 
         output.add_label(debut_label)
 
@@ -593,7 +593,7 @@ def compile_line(lines: list, labels: tuple, tree: list):
 
         if len(tokens) > 1:
             # reverse polish notation (RPN) expression
-            output.atend(op.calculate_rpn(tokens[1:]))
+            output.atend(op.calculate_expr(tokens[1:]))
 
             # move the result from the stack to the return value memory location
             output.add("pop",

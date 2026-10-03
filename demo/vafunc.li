@@ -2,7 +2,7 @@ vafunc test(argc, argp) {
     :i
     dump(argc)
     for i (0, argc) {
-        dump([argp i +])
+        dump([argp + i])
     }
 }
 

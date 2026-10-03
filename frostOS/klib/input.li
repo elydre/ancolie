@@ -4,12 +4,12 @@ func input(buffer, size) {
 
     while 1 {
         type = in(0x1010)
-        if type 0 == {
+        if type == 0 {
             // nothing for now
             out(0x1031, 1)
             continue
         }
-        if type 2 == {
+        if type == 2 {
             // keyboard release
             in(0x1011) // consume the keycode
             continue
@@ -17,8 +17,8 @@ func input(buffer, size) {
 
         chr = in(0x1011)
 
-        if chr '\b' == {
-            if buffer_i 0 > {
+        if chr == '\b' {
+            if buffer_i > 0 {
                 buffer_i--
                 putchar('\b')
                 screen_flush()
@@ -26,19 +26,19 @@ func input(buffer, size) {
             continue
         }
 
-        if chr '\r' == {
+        if chr == '\r' {
             putchar('\n')
             screen_flush()
-            [buffer buffer_i +] = 0
+            [buffer + buffer_i] = 0
             return buffer_i
         }
 
-        if chr 0xff00 b& {
+        if chr &b 0xff00 {
             continue
         }
 
-        if buffer_i size 1 - < {
-            [buffer buffer_i +] = chr
+        if buffer_i < size - 1 {
+            [buffer + buffer_i] = chr
             putchar(chr)
             screen_flush()
             buffer_i++

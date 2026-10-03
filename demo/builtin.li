@@ -1,9 +1,0 @@
-:var
-
-dump(_get_sp())
-dump(in(123))
-
-var = in(8)
-dump(var)
-
-dump(_get_sp())

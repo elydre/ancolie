@@ -4,9 +4,9 @@ dump(_get_sp())
 
 var = 7
 
-if var 5 == {
+if var == 5 {
     dump(1)
-} elif var 6 == {
+} elif var == 6 {
     dump(2)
 } else {
     dump(3)
