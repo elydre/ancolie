@@ -78,7 +78,7 @@ def validate_infix(tokens: list):
                 if close_bracket == -1:
                     utl.say_error("Unclosed brackets in pointer access", correct_syntax = "[ptr]")
                 i = close_bracket
-            
+
             elif previous == OTHER:
                 utl.say_error(f"Missing operator before '{token}'")
 
@@ -376,7 +376,10 @@ def fast_assign_var(v: defs.variable, tokens: list):
         if not f.does_return:
             utl.say_error(f"Function {f.name} does not return a value, cannot assign to variable {v.name}")
 
-        output.atend(op.call_func(f, tokens[2:-1], dest = (3, utl.to_u16(-v.offset))))
+        if v.is_static:
+            output.atend(op.call_func(f, tokens[2:-1], dest = (0, v.addr)))
+        else:
+            output.atend(op.call_func(f, tokens[2:-1], dest = (3, utl.to_u16(-v.offset))))
 
         return output
 
