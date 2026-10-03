@@ -114,6 +114,22 @@ ops = "sub|add|mul|div|mod|eq|neq|lt|gt|lte|gte|and|band|bor"
 
 patterns = [
     opti_pattern(
+        "push-pop",
+        [
+            ("push", "$1"),
+            ("pop", "$$1")
+        ],
+        []
+    ),
+    opti_pattern(
+        "pop-push",
+        [
+            ("pop", "$1"),
+            ("push", "$$1")
+        ],
+        []
+    ),
+    opti_pattern(
         "a = b",
         [
             ("push", "$1"),

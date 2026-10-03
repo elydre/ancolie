@@ -4,8 +4,8 @@ str = "Hello, World!"
 dump(str)
 
 for i (0, 100) {
-    c = [str i +]
-    if c 0 == {
+    c = [str + i]
+    if c == 0 {
         break
     }
     dump(c)

@@ -1,8 +1,6 @@
 func coucou(oui, non) {
-    return oui non +
+    return oui + non
 }
-
-: sum
 
 dump(_get_sp())
 

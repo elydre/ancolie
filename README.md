@@ -42,6 +42,7 @@ gcc -DGUI -o emulator emulator.c -lSDL2
 - [x] asm statements
 - [x] structs
 - [x] preprocessor
+- [x] infix expressions
 - [ ] heap arrays
 - [ ] multiple source files
 

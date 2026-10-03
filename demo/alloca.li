@@ -1,18 +1,22 @@
 dump(_get_sp())
 
-: ptr = alloca(10)
+sub {
+    : ptr = alloca(10)
 
-: i = 0
-while i 10 < {
-    [ptr i +] = i 10 *
-    i++
+    : i = 0
+    while i < 10 {
+        [ptr + i] = i * 10
+        i++
+    }
+
+    i = 0
+    while i < 10 {
+        dump([ptr + i])
+        i++
+    }
+
+
+    dump(_get_sp())
 }
-
-i = 0
-while i 10 < {
-    dump([ptr i +])
-    i++
-}
-
 
 dump(_get_sp())

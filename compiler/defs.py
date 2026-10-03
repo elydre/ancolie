@@ -194,20 +194,21 @@ OPERATORS = [
     opr(">>", 5),
     opr("&b", 4),
     opr("|b", 4),
-    opr("&&", 3),
 
-    opr("<",  2),
-    opr(">",  2),
-    opr("<=", 2),
-    opr(">=", 2),
-    opr("==", 1),
-    opr("!=", 1),
+    opr("<",  3),
+    opr(">",  3),
+    opr("<=", 3),
+    opr(">=", 3),
+    opr("==", 2),
+    opr("!=", 2),
+
+    opr("&&", 1),
 ]
 
-def get_operator_priority(opr):
+def get_operator(opr):
     for e in OPERATORS:
         if e.name == opr:
-            return e.level
+            return e
     utl.say_error(f"Unknown operator: {opr}", internal=True)
 
 MEMORY_SIZE = 65536 - (80 * 25)
@@ -229,17 +230,19 @@ STACK_PTR       = MEMORY_SIZE - 4
 STATIC_ADDR     = MEMORY_SIZE - 4 # will be decremented as static variables / strings are added
 STATIC_BYTES    = bytearray()
 
-CURRENT_LNO = ("", 0)
 CURRENT_SCOPE = "global"
+CURRENT_LNO   = ("", 0)
 
 ARG_EXTRAERR = False
-ARG_COOLERR = True
-ARG_VERBOSE = False
+ARG_COOLERR  = True
+ARG_VERBOSE  = False
+ARG_OPTI     = True
+ARG_RPN      = False
 
-LOCAL_VARS = {}
+LOCAL_VARS  = {}
 STATIC_VARS = {}
 
-ALL_FUNCS = []
+ALL_FUNCS   = []
 ALL_STRUCTS = []
 
 DATA_SEQ = []

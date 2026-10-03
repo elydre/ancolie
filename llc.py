@@ -17,14 +17,19 @@ parser.add_argument("-a", "--dump-asm",     help="Dump assembly code to stdout",
 parser.add_argument("-v", "--verbose",      help="Verbose output",               action="store_true", dest="verbose")
 parser.add_argument("-x", "--extra-errors", help="Add boring code checks",       action="store_true", dest="extra_err")
 
-parser.add_argument("-n", "--no-opti",      help="Disable optimizations",            action="store_true", dest="no_opti")
-parser.add_argument("-r", "--no-header",    help="Disable compiler built-in header", action="store_true", dest="no_header")
-parser.add_argument("-e", "--no-color",     help="Disable colored error messages",   action="store_true", dest="no_coolerr")
+parser.add_argument("-0", "--no-opti", help="Disable optimizations",            action="store_true", dest="no_opti")
+parser.add_argument("--no-color",      help="Disable colored error messages",   action="store_true", dest="no_coolerr")
+parser.add_argument("--no-header",     help="Disable compiler built-in header", action="store_true", dest="no_header")
+
+parser.add_argument("--rpn",           help="Expect RPN instead of infix",      action="store_true", dest="rpn")
+
 args = parser.parse_args()
 
 defs.ARG_EXTRAERR = args.extra_err
 defs.ARG_VERBOSE  = args.verbose
 defs.ARG_COOLERR  = not args.no_coolerr
+defs.ARG_OPTI     = not args.no_opti
+defs.ARG_RPN      = args.rpn
 
 try:
     with open(args.input_file, "r") as ifile:
@@ -34,7 +39,7 @@ except FileNotFoundError:
 
 main_output = compile(lines, args.input_file, not args.no_header)
 
-if not args.no_opti:
+if defs.ARG_OPTI:
     main_output = optimize(main_output)
 
 if args.dump_asm:

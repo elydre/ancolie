@@ -26,7 +26,7 @@ func shell_echo(argc, argv) {
     : i
 
     for i (1, argc) {
-        print([argv i +])
+        print([argv + i])
         putchar(' ')
     }
     putchar('\n')
@@ -42,19 +42,20 @@ func shell_time(argc, argv) {
     : t
     t = in(0x1030)
 
-    printf("it is %d:%d\n", t 1000 / 6 +, t 1000 % 50 * 833 /)
+    // printf("it is %d:%d\n", t 1000 / 6 +, t 1000 % 50 * 833 /)
+    printf("it is %d:%d\n", t / 1000 + 6, t % 1000 * 50 / 833)
 }
 
 func shell_color(argc, argv) {
     : color
 
-    if strlen([argv 1 +]) 2 != {
+    if strlen([argv + 1]) != 2 {
         print("Invalid color, must be 2 hex digits like '0F' or 'A7'\n")
         return
     }
 
-    color = screen_mk_color([argv 1 +])
-    if color 1 == {
+    color = screen_mk_color([argv + 1])
+    if color == 1 {
         print("Invalid color, must be 2 hex digits like '0F' or 'A7'\n")
         return
     }
@@ -68,12 +69,12 @@ func interpret(buffer) {
 
     arg_count = strsplit_count(buffer, ' ')
 
-    if arg_count 0 == {
+    if arg_count == 0 {
         return
     }
 
-    args = alloca(arg_count 1 +)
-    [args arg_count +] = 0
+    args = alloca(arg_count + 1)
+    [args + arg_count] = 0
 
     strsplit(buffer, args)
 
