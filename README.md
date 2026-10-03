@@ -68,12 +68,10 @@ gcc -DGUI -o emulator emulator.c -lSDL2
 : ptr str i       // multiple variable declaration
 
 $ hello           // static variable declaration (set to 0)
-$ var = 3         // static variable declaration with initialization
+$ hi = 3          // static variable declaration with initialization
 
-/* The language use RPN (Reverse Polish Notation).
-*/
 var = 3           // variable assignment
-var = 3 4 +       // assignment from RPN expression (3 + 4)
+var = 3 + 4       // assignment from expression
 var = i           // assignment from another variable
 
 /* Strings are stored in the heap, the variable
@@ -86,7 +84,7 @@ str = "hello"     // string assignment
 var = [0]         // variable assignment from memory address 0
 [0] = var         // memory address 0 assignment from variable
 var = [str]       // variable assignment from string pointer
-var = [str 1 +]   // assignment from string pointer + 1 (next character)
+var = [str + 1]   // assignment from string pointer + 1 (next character)
 
 /* The built-in function alloca() allocates memory
 ** on the stack and returns a pointer to it.
@@ -95,13 +93,12 @@ ptr = alloca(10)  // allocate 10 bytes on the stack
 [ptr] = 3         // assign 3 to the first byte of the allocation
 
 /* Usual control keywords (if, elif, else, while) are available.
-** They expect RPN expressions, parentheses around
-** the expressions are tolerated.
+** Parentheses around the expressions are tolerated.
 */
-while var 0 != {
-    if var 1 == {
+while var != 0 {
+    if var == 1 {
         continue
-    } elif var 2 == {
+    } elif var == 2 {
         break
     } else {
         // do something else
@@ -119,7 +116,7 @@ for i (0, 10) {
 ** They can have arguments and return values.
 */
 func add(a, b) {        // classic function declaration
-    return a b +        // return the sum of a and b
+    return a + b        // return the sum of a and b
 }
 
 vafunc sum(argc, argp) {    // variable arguments function
@@ -127,7 +124,7 @@ vafunc sum(argc, argp) {    // variable arguments function
     // `argp` is a pointer to the first argument
     : s
     for i (0, argc) {
-        s = [argp i +] s +  // sum all arguments
+        s = s + [argp + i]  // sum all arguments
     }
     return s
 }
@@ -170,6 +167,7 @@ asm {
 
 | FUNCTION                  | DESCRIPTION                                             |
 | ------------------------- | ------------------------------------------------------- |
+| `val = rpn(expr)`         | evaluate a raw RPN expression and return the result     |
 | `addr = alloca(size)`     | allocate `size` bytes on the stack and return a pointer to it |
 | `addr = array(...)`       | allocate an array in the stack and return a pointer to it     |
 | `size = sizeof(struct)`   | return the size of a struct in bytes                    |
@@ -270,7 +268,7 @@ each argument can be one of the following:
 | `0x1030`     | in        | get ingame time in ticks                       |
 | `0x1031`     | out       | sleep for `n` ticks (1 tick = 50ms)            |
 
-Screen is a 80x25 text screen located in memory at address `0xF830`. Each word represents a character and its color. The lower 8 bits are the ASCII code of the character, and the upper 8 bits are the color (4 bits for foreground and 4 bits for background).
+Screen is a 80x25 text screen located in memory at address `0xF830` (defined in the builtin `_lSCREEN` macro). Each word represents a character and its color. The lower 8 bits are the ASCII code of the character, and the upper 8 bits are the color (4 bits for foreground and 4 bits for background).
 
 ## Compiled file format
 
