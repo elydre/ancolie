@@ -3,15 +3,28 @@ import compiler.utils as utl
 import compiler.defs as defs
 import compiler.op as op
 
-def blt_rpn(args: list):
+def to_dest(dest, src):
     output = out.output_code()
 
-    output.atend(op.calculate_expr(args[0], is_infix=False))
-    output.add("pop", (0, defs.FUNC_RET_ADDR))
+    if isinstance(dest, tuple):
+        output.add("mov", dest, src)
+    elif dest == "push":
+        output.add("push", src)
 
     return output
 
-def blt_alloca(args: list):
+
+def blt_rpn(args: list, dest):
+    output = out.output_code()
+
+    output.atend(op.calculate_expr(args[0], is_infix=False))
+
+    if isinstance(dest, tuple):
+        output.add("pop", dest)
+
+    return output
+
+def blt_alloca(args: list, dest):
     output = out.output_code()
     # calculate the requested size in bytes
     output.atend(op.calculate_expr(args[0]))
@@ -27,26 +40,22 @@ def blt_alloca(args: list):
             (1, 0))
 
     # copy the current stack pointer value to return memory location
-    output.add("mov",
-            (0, defs.FUNC_RET_ADDR),
-            (0, defs.STACK_PTR))
+    output.atend(to_dest(dest, (0, defs.STACK_PTR)))
 
     return output
 
-def blt_array(args: list):
+def blt_array(args: list, dest):
     output = out.output_code()
 
     # push all arguments to the stack
     for arg in args[::-1]:
         output.atend(op.calculate_expr(arg))
 
-    output.add("mov",
-            (0, defs.FUNC_RET_ADDR),
-            (0, defs.STACK_PTR))
+    output.atend(to_dest(dest, (0, defs.STACK_PTR)))
 
     return output
 
-def blt_sizeof(args: list):
+def blt_sizeof(args: list, dest):
     output = out.output_code()
 
     if len(args[0]) != 1 or not defs.is_struct(args[0][0]):
@@ -54,9 +63,7 @@ def blt_sizeof(args: list):
 
     struct = defs.get_struct(args[0][0])
 
-    output.add("mov",
-            (0, defs.FUNC_RET_ADDR),
-            (1, struct.get_size()))
+    output.atend(to_dest(dest, (1, struct.get_size())))
 
     return output
 
@@ -73,12 +80,21 @@ def blt_out(args: list):
 
     return output
 
-def blt_in(args: list):
+def blt_in(args: list, dest):
     output = out.output_code()
 
     output.atend(op.calculate_expr(args[0]))
-    output.add("in", (0, defs.FUNC_RET_ADDR), (2, 0))
-    output.add("pop", (1, 0))
+
+    if isinstance(dest, tuple):
+        output.add("in", dest, (2, 0))
+        output.add("pop", (1, 0))
+
+    elif dest == "push":
+        output.add("in", (0, defs.STACK_PTR), (2, 0))
+
+    else:
+        output.add("in", (1, 0), (2, 0)) # ignore the return value
+        output.add("pop", (1, 0))
 
     return output
 

@@ -122,14 +122,6 @@ patterns = [
         []
     ),
     opti_pattern(
-        "pop-push",
-        [
-            ("pop", "$1"),
-            ("push", "$$1")
-        ],
-        []
-    ),
-    opti_pattern(
         "a = b",
         [
             ("push", "$1"),
@@ -219,6 +211,17 @@ patterns = [
         ],
         [
             ("out", "$1", "$2")
+        ]
+    ),
+    opti_pattern(
+        "out(n, a)",
+        [
+            ("push", "$1"),
+            ("out", "$2", (2, 0)),
+            ("pop", (1, 0))
+        ],
+        [
+            ("out", "$2", "$1")
         ]
     ),
     opti_pattern(

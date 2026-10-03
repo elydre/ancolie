@@ -69,18 +69,10 @@ def define(tokens_lines):
             if line[3] != "(":
                 new_define.replacement_tokens = line[3:]
                 continue
-                
-            open_count = 1
-            for i in range(4, len(line)):
-                if line[i] == "(":
-                    open_count += 1
-                elif line[i] == ")":
-                    open_count -= 1
 
-                if open_count == 0:
-                    closing_par = i
-                    break
-            else:
+            closing_par = toks.find_closing_paren(line, 3)
+
+            if closing_par == -1:
                 utl.say_error(f"Unclosed parentheses in define statement", correct_syntax = "#define MACRO(arg) something(arg)")
 
             # check if the closing parenthesis is the last token in the line
@@ -116,17 +108,9 @@ def define(tokens_lines):
                 if line[i + 1] != "(":
                     continue
 
-                open_count = 1
-                for j in range(i + 2, len(line)):
-                    if line[j] == "(":
-                        open_count += 1
-                    elif line[j] == ")":
-                        open_count -= 1
+                closing_par = toks.find_closing_paren(line, i + 1)
 
-                    if open_count == 0:
-                        closing_par = j
-                        break
-                else:
+                if closing_par == -1:
                     utl.say_error(f"Unclosed parentheses in macro call")
 
                 args = toks.split_func_args(line[i + 2:closing_par])

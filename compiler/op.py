@@ -249,12 +249,8 @@ def calculate_expr(rpn: list, is_infix: bool = True):
             if end == -1:
                 utl.say_error("Unclosed parenthesis in function call", correct_syntax = f"{token}(arg1, arg2)")
 
-            output.atend(op.call_func(f, rpn[i + 2:end]))
+            output.atend(op.call_func(f, rpn[i + 2:end], dest = "push"))
             skip_to = end + 1
-
-            # push the return value to the stack if the function returns a value
-            output.add("push",
-                    (0, defs.FUNC_RET_ADDR))
             stack_size += 1
 
         elif utl.is_number(token) or utl.is_char(token):
@@ -380,12 +376,7 @@ def fast_assign_var(v: defs.variable, tokens: list):
         if not f.does_return:
             utl.say_error(f"Function {f.name} does not return a value, cannot assign to variable {v.name}")
 
-        output.atend(op.call_func(f, tokens[2:-1]))
-
-        # move the result from FUNC_RET_ADDR to the variable's memory location
-        output.add("mov",
-                (3, utl.to_u16(-v.offset)),
-                (0, defs.FUNC_RET_ADDR))
+        output.atend(op.call_func(f, tokens[2:-1], dest = (3, utl.to_u16(-v.offset))))
 
         return output
 
@@ -399,18 +390,9 @@ def load_ptraddr(tokens: list):
 
     # find the closing bracket and send to RPN calculator
 
-    open_brackets = 1
-    end = 1
+    end = toks.find_closing_paren(tokens, 0, chars=('[', ']'))
 
-    for i, token in enumerate(tokens[1:]):
-        if token == '[':
-            open_brackets += 1
-        elif token == ']':
-            open_brackets -= 1
-            if open_brackets == 0:
-                end += i
-                break
-    else:
+    if end == -1:
         utl.say_error("Unclosed brackets in pointer access", correct_syntax = "[ptr]")
 
     output.atend(op.calculate_expr(tokens[1:end]))
@@ -427,18 +409,9 @@ def load_fieldaddr(tokens: list):
 
     # find the closing bracket and send to RPN calculator
 
-    open_brackets = 1
-    end = 1
+    end = toks.find_closing_paren(tokens, 1, chars=('[', ']'))
 
-    for i, token in enumerate(tokens[2:]):
-        if token == '[':
-            open_brackets += 1
-        elif token == ']':
-            open_brackets -= 1
-            if open_brackets == 0:
-                end += i + 1
-                break
-    else:
+    if end == -1:
         utl.say_error("Unclosed brackets in struct access", correct_syntax = "struct_name[address].field_name")
 
     output.atend(op.calculate_expr(tokens[2:end]))
@@ -457,14 +430,20 @@ def load_fieldaddr(tokens: list):
 
     return (output, end + 3)
 
-def call_func(f: defs.func, tokens: list):
+def call_func(f: defs.func, tokens: list, dest = None):
     args = toks.split_func_args(tokens)
+
+    if (dest is not None) and (not isinstance(dest, tuple)) and (dest != "push"):
+        utl.say_error(f"Invalid destination for function return value: {dest}", internal=True)
 
     if not f.is_vaargs and len(args) != f.argc:
         utl.say_error(f"Wrong number of arguments for function {f.name}", correct_syntax = f"{f.name}({', '.join(['var' + str(i + 1) for i in range(f.argc)])})")
 
     if f.is_builtin:
-        return f.blt_handler(args)
+        if f.does_return:
+            return f.blt_handler(args, dest)
+        else:
+            return f.blt_handler(args)
 
     output = out.output_code()
 
@@ -516,5 +495,14 @@ def call_func(f: defs.func, tokens: list):
     else:
         output.add("pop",
                 (1, 0)) # pop the call end label from the stack
+
+    if isinstance(dest, tuple):
+        output.add("mov",
+                dest,
+                (0, defs.FUNC_RET_ADDR))
+
+    elif dest == "push":
+        output.add("push",
+                (0, defs.FUNC_RET_ADDR))
 
     return output
