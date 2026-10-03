@@ -1,0 +1,134 @@
+struct madata {
+    : debut
+    : size
+    : block_size
+    : index_size
+}
+
+$ g_malloc_data
+$ g_bitshift
+$ g_nbitshift
+g_malloc_data = alloca(sizeof(madata))
+
+g_bitshift = array(1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768)
+g_nbitshift = array(65534, 65533, 65531, 65527, 65519, 65503, 65471, 65407, 65279, 65023, 64511, 63487, 61439, 57343, 49151, 32767)
+
+#define malloc_data madata[g_malloc_data]
+#define MALLOC_MAGIC 0xDEAD
+
+func needed_to_index(size, block_size) {
+    return (size - 1) / (16 * block_size) + 1
+}
+
+
+func init_malloc(debut, size, block_size) {
+    : tmp needed = 0
+
+    tmp = needed_to_index(size, block_size)
+
+    while (tmp != needed) {
+        needed = tmp
+        tmp = needed_to_index(size - tmp, block_size)
+    }
+    dump(needed)
+
+    memset(debut, 0, needed)
+
+    malloc_data.debut = debut
+    malloc_data.size = size
+    malloc_data.block_size = block_size
+    malloc_data.index_size = needed
+}
+
+func malloc(size) {
+    : debut_addr debut_index
+    : addr i j k
+    : free_count = 0
+
+    : s = (size + 1) / malloc_data.block_size + 1
+
+    for addr (malloc_data.debut, malloc_data.debut + malloc_data.index_size) {
+        if ([addr] == 0xFFFF) {
+            free_count = 0
+            continue
+        }
+
+        for i (0, 16) {
+            if ([addr] &b [g_bitshift + i] == 0) {
+                if (free_count == 0) {
+                    debut_addr = addr
+                    debut_index = i
+                }
+                free_count++
+            } else {
+                free_count = 0
+            }
+
+            if (free_count != s) {
+                continue
+            }
+
+            : d = debut_index
+            for j (debut_addr, addr + 1) {
+                for k (d, 16) {
+                    [j] = [j] |b [g_bitshift + k]
+                    if (j == addr && k == i) {
+                        break
+                    }
+                }
+                d = 0
+            }
+            addr = malloc_data.debut + malloc_data.index_size + debut_addr * malloc_data.block_size * 16 + debut_index * malloc_data.block_size
+            [addr++] = MALLOC_MAGIC
+            [addr++] = size
+            return addr
+        }
+    }
+}
+
+func free(addr) {
+    : debut_addr
+    : debut_index
+    : size i j
+
+    addr = addr - 2
+    if ([addr] != MALLOC_MAGIC) {
+        dump(1234)
+        return
+    }
+
+    size = [addr + 1]
+    size = size + 2
+
+    addr = addr - (malloc_data.debut + malloc_data.index_size)
+    debut_addr = addr / (malloc_data.block_size * 16)
+    debut_index = (addr % (malloc_data.block_size * 16)) / malloc_data.block_size
+
+    for i (debut_addr, malloc_data.index_size) {
+        for j (debut_index, 16) {
+            [i] = [i] &b [g_nbitshift + j]
+            size = size - malloc_data.block_size
+            if (size <= 0) {
+                return
+            }
+        }
+        debut_index = 0
+    }
+}
+
+init_malloc(0, 0x1000, 1)
+
+func test_malloc() {
+    : a = malloc(10)
+    : b = malloc(1)
+
+    dump(a)
+    dump(b)
+
+    free(a)
+
+    a = malloc(4)
+    dump(a)
+}
+
+test_malloc()
