@@ -94,9 +94,14 @@ def to_number(s):
         return char_escape_dict[s[1:3]]
 
     if s.startswith("0x"):
-        return int(s, 16)
+        n = int(s, 16)
     else:
-        return int(s)
+        n = int(s)
+
+    if n < 0 or n > 65535:
+        say_error(f"Number out of range: {n}")
+
+    return n
 
 def is_char(s):
     if s[0] != "'" or s[-1] != "'":
