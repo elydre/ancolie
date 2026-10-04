@@ -114,7 +114,9 @@ def compile_line(lines: list, labels: tuple, tree: list):
     defs.CURRENT_LNO, tokens = lines[0]
 
     output = out.output_code()
-    output.add_comment(f"\n{defs.CURRENT_LNO[0]} l{defs.CURRENT_LNO[1]:03}  {' '.join(tokens)}")
+    output.add_comment(f"\n{defs.CURRENT_LNO[0]}:{defs.CURRENT_LNO[1]:03}  {' '.join(tokens)}")
+
+    utl.verbose(f"{defs.CURRENT_LNO[0]}:{defs.CURRENT_LNO[1]:03}  {' '.join(tokens)}")
 
     new_tree = tree + [tokens[0]]
 
@@ -132,7 +134,7 @@ def compile_line(lines: list, labels: tuple, tree: list):
                 utl.say_error("Bad pointer declaration", correct_syntax = f"{def_char} [ptr_name]")
 
             # check for closing brackets
-            if ptrlvl and (ptrlvl * ']' != ''.join(tokens[1 + ptrlvl:2 + ptrlvl * 2])):
+            if ptrlvl and (ptrlvl * ']' != ''.join(tokens[1 + ptrlvl:1 + ptrlvl * 2])):
                 utl.say_error("Bad pointer declaration", correct_syntax = f"{def_char} [ptr_name]")
 
             var_name = tokens[ptrlvl]
@@ -285,7 +287,7 @@ def compile_line(lines: list, labels: tuple, tree: list):
 
             if next_tokens[0] == "else":
                 if len(next_tokens) != 1:
-                    utl.say_error(f"Unexpected token {next_tokens[1]} after else", correct_syntax = "else " + "{ ... }")
+                    utl.say_error(f"Unexpected token '{next_tokens[1]}' after else", correct_syntax = "else " + "{ ... }")
                 # compile the lines inside the else block
                 tmp = toks.locate_braces(lines, closing_line + 1)
                 inner_output = compile_lines(lines[closing_line + 3:tmp], labels, tree + ["else"])
@@ -377,8 +379,8 @@ def compile_line(lines: list, labels: tuple, tree: list):
 
         args = toks.split_func_args(tokens[3:-1])
 
-        if len(args) not in (1, 2):
-            utl.say_error("Expected 1 or 2 arguments for for loop", correct_syntax = "for var (0, 10) OR for var (0)")
+        if len(args) not in (1, 2, 3):
+            utl.say_error("Expected 1, 2 or 3 arguments for for loop", correct_syntax = "for var (debut) OR for var (debut, fin) OR for var (debut, fin, step)")
 
         # init the loop variable with the debut value
         fast_assignment = op.fast_assign_var(v, args[0])
@@ -396,21 +398,23 @@ def compile_line(lines: list, labels: tuple, tree: list):
         next_label  = utl.get_new_label()
         fin_label   = utl.get_new_label()
 
-        if len(args) == 2:
+        if len(args) == 3:
+            # push the loop step value onto the stack
+            output.atend(op.calculate_expr(args[2]))
+
+        if len(args) >= 2:
             # push the loop fin value onto the stack
             output.atend(op.calculate_expr(args[1]))
 
         output.add_label(debut_label)
 
-        if len(args) == 2:
+        if len(args) >= 2:
             # compare the loop variable with the fin value
-            output.add("push",
-                    (3, utl.to_u16(-v.offset)))
+            output.add("mov",
+                    (0, defs.COND_RES_ADDR), (3, utl.to_u16(-v.offset)))
             output.add("lt",
-                    (2, 0), (2, 1))
-            output.add("pop",
-                    (0, defs.COND_RES_ADDR))
-
+                    (0, defs.COND_RES_ADDR), (2, 0))
+            
             output.add_goto(
                     fin_label, (0, defs.COND_RES_ADDR)) # jump if the condition is false
 
@@ -423,12 +427,10 @@ def compile_line(lines: list, labels: tuple, tree: list):
         output.add_comment(f"\nIncrement the loop variable {v.name}")
 
         output.add_label(next_label)
-        output.add("push",
-                (3, utl.to_u16(-v.offset)))
-        output.add("add",
-                (2, 0), (1, 1))
-        output.add("pop",
-                (3, utl.to_u16(-v.offset)))
+        if len(args) == 3:
+            output.add("add", (3, utl.to_u16(-v.offset)), (2, 1))
+        else:
+            output.add("add", (3, utl.to_u16(-v.offset)), (1, 1))
 
         output.add_goto(
                 debut_label, (1, 0)) # unconditional jump to the beginning of the for loop
@@ -437,6 +439,8 @@ def compile_line(lines: list, labels: tuple, tree: list):
 
         if len(args) == 2:
             output.add("pop", (1, 0)) # pop the fin value from the stack
+        elif len(args) == 3:
+            output.add("add", (0, defs.STACK_PTR), (1, 2)) # pop the step and fin values from the stack
 
         return (output, closing_line + 1)
 
@@ -457,8 +461,20 @@ def compile_line(lines: list, labels: tuple, tree: list):
         new_scope = f"func_{tokens[1]}"
 
         for i, e in enumerate(args):
-            if len(e) != 1:
-                utl.say_error("Bad syntax in arguments", correct_syntax = f"{tokens[0]} func_name(arg1, arg2)")
+            ptrlvl = 0
+            while e[ptrlvl] == '[':
+                ptrlvl += 1
+
+            end_brackets = 1 + ptrlvl * 2
+            if len(e) != end_brackets:
+                utl.say_error("Bad syntax in arguments", correct_syntax = f"func_name(arg1, arg2)")
+
+            # check for closing brackets
+            if ptrlvl:
+                if (ptrlvl * ']' != ''.join(e[1 + ptrlvl:1 + ptrlvl * 2])):
+                    utl.say_error("Bad pointer declaration in arguments", correct_syntax = f"func_name([arg1], arg2)")
+                e = [e[ptrlvl]]
+
             if not utl.is_valid_name(e[0]):
                 utl.say_error(f"Invalid argument name: {e[0]}")
             defs.variable(e[0], 0, i + 1, is_func_arg = True, scope = new_scope).add()

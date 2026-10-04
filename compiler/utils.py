@@ -4,6 +4,7 @@ import ctypes
 import sys
 
 char_escape_dict = {
+    "\\0": 0,
     "\\n": 10,
     "\\t": 9,
     "\\r": 13,

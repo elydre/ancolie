@@ -47,11 +47,11 @@ def validate_infix(tokens: list):
         token = tokens[i]
 
         if token in defs.CHARS_OPR + ["."]:
-            if previous in (OP, OPEN_PAR) and token != "&":
+            if previous in (OP, OPEN_PAR) and token not in ("&", "!"):
                 utl.say_error(f"Missing value before operator '{token}'")
 
-            if token == "&" and previous not in (OP, OPEN_PAR):
-                utl.say_error(f"Unexpected '&' operator without a variable")
+            if token in ("&", "!") and previous not in (OP, OPEN_PAR):
+                utl.say_error(f"Missing operator before '{token}'")
 
             if i == len(tokens) - 1 and token not in ("++", "--"):
                 utl.say_error(f"Operator at the end of expression '{token}'")
@@ -84,11 +84,18 @@ def validate_infix(tokens: list):
 
             previous = OTHER
 
+            if len(tokens) > i + 1 and tokens[i + 1] == "[":
+                if not utl.is_valid_name(token):
+                    utl.say_error(f"Unexpected token '{token}' before opening bracket")
+                if not defs.is_struct(token):
+                    utl.say_error(f"Unknown struct '{token}'")
+                # brackets are handled in the next iteration of the loop
+
             if len(tokens) > i + 1 and tokens[i + 1] == "(":
                 if not utl.is_valid_name(token):
                     utl.say_error(f"Unexpected token '{token}' before opening parenthesis")
                 if not defs.is_func(token):
-                    utl.say_error(f"Unknown function '{token}' in expression")
+                    utl.say_error(f"Unknown function '{token}'")
                 close_paren = toks.find_closing_paren(tokens, i + 1)
                 if close_paren == -1:
                     utl.say_error("Unclosed parenthesis in function call", correct_syntax = "func_name(var1, var2)")
@@ -175,9 +182,6 @@ def calculate_expr(rpn: list, is_infix: bool = True):
 
         return False
 
-    if len(rpn) > 1 and rpn[0] == '(' and toks.find_closing_paren(rpn, 0) == len(rpn) - 1:
-        utl.say_error("Unnecessary parentheses in expression", extra=True)
-        rpn = rpn[1:-1]
 
     if len(rpn) == 0:
         utl.say_error("Empty expression")
@@ -187,6 +191,10 @@ def calculate_expr(rpn: list, is_infix: bool = True):
             is_infix = False
         else:
             rpn = infix_to_rpn(rpn)
+
+    if not is_infix and (len(rpn) > 1 and rpn[0] == '(' and toks.find_closing_paren(rpn, 0) == len(rpn) - 1):
+        utl.say_error("Unnecessary parentheses in RPN expression", extra=True)
+        rpn = rpn[1:-1]
 
     stack_size = 0
     skip_to = 0
@@ -305,10 +313,15 @@ def calculate_expr(rpn: list, is_infix: bool = True):
                 output.add("gte", a, b)
             elif token == '&&':
                 output.add("and", a, b)
+            elif token == '||':
+                output.add("bor", a, b)
             elif token == '|b':
                 output.add("bor", a, b)
             elif token == '&b':
                 output.add("band", a, b)
+            elif token == '!':
+                output.add("eq", b, (1, 0))
+                stack_size += 1 # noting consumed
             elif token == '>>':
                 if last_number is None:
                     utl.say_error(f"Bitshift operator requires a number as second operand")
@@ -320,7 +333,7 @@ def calculate_expr(rpn: list, is_infix: bool = True):
             else:
                 utl.say_error(f"Unknown operator in expression: {token}", internal=True)
 
-            if last_number is None:
+            if last_number is None and token != '!':
                 output.add("pop",
                     (1, 0))
             else:

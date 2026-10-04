@@ -183,6 +183,7 @@ OPERATORS = [
     opr("++", 8),
     opr("--", 8),
     opr("&", 8),
+    opr("!", 8),
 
     opr("*", 7),
     opr("/", 7),
@@ -203,6 +204,7 @@ OPERATORS = [
     opr("!=", 2),
 
     opr("&&", 1),
+    opr("||", 1),
 ]
 
 def get_operator(opr):

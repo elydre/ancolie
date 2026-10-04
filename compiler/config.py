@@ -10,4 +10,7 @@ LLC_HEADER = f"""
 #define _lSCREEN {defs.MEMORY_SIZE}
 
 #define _get_sp() [_lSP]
+
+#define NULL 0
+#define INTMAX 0xFFFF
 """

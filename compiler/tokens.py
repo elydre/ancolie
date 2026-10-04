@@ -22,7 +22,7 @@ def tokenize_line(line: str):
         if i < skip_to:
             continue
 
-        if (in_string and char == string_token) or ((not in_string) and (char in ["'", '"'])):
+        if (in_string and char == string_token and (i == 0 or line[i - 1] != "\\")) or ((not in_string) and (char in ["'", '"'])):
             current_token += char
             if in_string:
                 tokens.append(current_token)
@@ -79,12 +79,39 @@ def tokenize_line(line: str):
 def tokenize_lines(lines: str, filename: str):
     tokens_lines = []
 
-    for lno, line in enumerate(lines.splitlines(), start=1):
-        defs.CURRENT_LNO = lno
+    paren_stack = []
+    should_extend = False
 
-        line = line.strip()
-        for t in tokenize_line(line):
-            tokens_lines.append(((filename, lno), t))
+    for lno, line in enumerate(lines.splitlines(), start=1):
+        defs.CURRENT_LNO = (filename, lno)
+
+        sub = tokenize_line(line.strip())
+
+        for t in sub:
+            for token in t:
+                if token == "(":
+                    paren_stack.append(token)
+                elif token == ")":
+                    if not paren_stack:
+                        utl.say_error("Unmatched closing parenthesis")
+                    if paren_stack[-1] != "(":
+                        utl.say_error("Mismatched parentheses and brackets")
+                    paren_stack.pop()
+                elif token == "[":
+                    paren_stack.append(token)
+                elif token == "]":
+                    if not paren_stack:
+                        utl.say_error("Unmatched closing bracket")
+                    if paren_stack[-1] != "[":
+                        utl.say_error("Mismatched parentheses and brackets")
+                    paren_stack.pop()
+
+            if should_extend:
+                tokens_lines[-1][1].extend(t)
+            else:
+                tokens_lines.append(((filename, lno), t))
+
+            should_extend = len(paren_stack) > 0
 
     return tokens_lines
 
