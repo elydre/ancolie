@@ -59,19 +59,22 @@ func puthex(n) {
     putchar([base + n % 16])
 }
 
-func print(str) {
+func printn(str, len) {
     : i c
 
-    for i (0) {
+    for i (0, len) {
         c = [str + i]
         if c == 0 {
             break
         }
         putchar(c)
+        if c == '\n' {
+            screen_flush()
+        }
     }
-
-    screen_flush()
 }
+
+#define print(str) printn(str, INTMAX)
 
 func screen_mk_color(str) {
     : i c color
@@ -128,6 +131,9 @@ vafunc printf(argc, argp) {
             elif c == 's' {
                 print([argp])
             }
+            elif c == 'S' {
+                printn([argp++], [argp])
+            }
             elif c == 'c' {
                 putchar([argp])
             }
@@ -149,5 +155,8 @@ vafunc printf(argc, argp) {
             continue
         }
         putchar(c)
+        if c == '\n' {
+            screen_flush()
+        }
     }
 }

@@ -1,0 +1,714 @@
+#define VAR_STRING 1
+#define VAR_NUMBER 2
+
+#define WORD_NONE 0
+#define WORD_VAR  1
+#define WORD_STR  2
+#define WORD_NUM  3
+
+#define WORD_FIRST_INST 4
+
+#define WORD_INST_INPUT 4
+#define WORD_INST_PRINT 5
+#define WORD_INST_GOTO  6
+#define WORD_INST_IF    7
+#define WORD_INST_STOP  8
+#define WORD_INST_LET   9
+#define WORD_INST_LEN   10
+#define WORD_INST_THEN  11
+#define WORD_INST_LT    12
+#define WORD_INST_PLUS  13
+
+#define VAARG_FUNC 10
+
+#define EXEC_END      0xFFFF
+#define EXEC_ERROR    0xFFFE
+#define EXEC_CONTINUE 0xFFFD
+
+// standard library
+$ screen_x
+$ screen_y
+$ screen_color = 0x0F00
+
+#include "malloc.li"
+#include "klib/screen.li"
+
+func issamestr([str1], str1len, [str2]) { // str2 is null-terminated
+    : i
+
+    for i (0, str1len) {
+        if ([str1 + i] != [str2 + i]) {
+            return 0
+        }
+        if ([str2 + i] == 0) {
+            return 0
+        }
+    }
+
+    if ([str2 + str1len] != 0) {
+        return 0
+    }
+
+    return 1
+
+}
+
+func strlen([str]) {
+    : len = 0
+
+    while ([str + len]) {
+        len++
+    }
+
+    return len
+}
+
+func strndup([str], length) {
+    : [new_str] = malloc(length + 1)
+    : i
+
+    for i (0, length) {
+        [new_str + i] = [str + i]
+    }
+    [new_str + length] = '\0'
+
+    return new_str
+}
+
+func atoi([str]) {
+    : result = 0
+    : i = 0
+
+    while ([str + i] >= '0' && [str + i] <= '9') {
+        result = result * 10 + ([str + i] - '0')
+        i++
+    }
+
+    return result
+}
+
+// end
+
+
+struct var_s {
+    : [name]
+    : type
+    : value  // union { [str], num }
+    : [prev] // var_s
+}
+
+struct word_s {
+    : type
+    : value // union { word [value], var_s [var_ptr], [str], num }
+}
+
+struct program_s {
+    : [variables] // var_s
+    : [lines]     // word_s
+}
+
+struct instruction_s {
+    : type
+    : [name]
+    : argc
+}
+
+$ [g_var_tail] = NULL // var_s
+$ [g_goto_table] = 0x10
+$ [[g_instructions]]
+
+#define INSTRCTIONS_COUNT 10
+
+g_instructions = array(
+    WORD_INST_INPUT, "INPUT", 1,
+    WORD_INST_PRINT, "PRINT", VAARG_FUNC,
+    WORD_INST_GOTO,  "GOTO",  1,
+    WORD_INST_IF,    "IF",    2,
+    WORD_INST_STOP,  "STOP",  0,
+    WORD_INST_LET,   "LET",   2,
+    WORD_INST_LEN,   "LEN",   1,
+    WORD_INST_THEN,  "THEN",  VAARG_FUNC,
+    WORD_INST_LT,    "<",     2,
+    WORD_INST_PLUS,  "+",     2
+)
+
+#define HEAP_DEBUT 0x2010
+
+func new_word(count) {
+    $ addr = HEAP_DEBUT
+    : old = addr
+
+    addr = addr + sizeof(word_s) * count
+    return old
+}
+
+func tok_end([str], length) {
+    : in_quotes = 0
+    : i = 0
+
+    while (i < length && [str + i] && ([str + i] != ' ' || in_quotes) && [str + i] != '\n') {
+        if ([str + i] == '"') {
+            in_quotes = !in_quotes
+        }
+        i++
+    }
+    return i
+}
+
+func line_end([str], length) {
+    : i = 0
+
+    while (i < length && [str + i] && [str + i] != '\n') {
+        i++
+    }
+    return i
+}
+
+func isnumber([str], length) {
+    :i
+    if (length == 0) {
+        return 0
+    }
+    for i (0, length) {
+        if ([str + i] < '0' || [str + i] > '9') {
+            return 0
+        }
+    }
+    return 1
+}
+
+// func free_word([word], is_parent) { // word_s[word]
+//     if (word_s[word].type >= WORD_FIRST_INST) {
+//         for (int i = 0 word_s[word].value[i].type != WORD_NONE i++) {
+//             free_word(word_s[word].value + i, 0)
+//         }
+//     } else if (word_s[word].type == WORD_STR) {
+//         free(word_s[word].str)
+//     }
+//     if (is_parent) {
+//         free(word)
+//     } else if (word_s[word].type >= WORD_FIRST_INST) {
+//         free(word_s[word].value)
+//     }
+// }
+
+func is_valid_var_name([str], length) {
+    if (length == 0) {
+        return 0
+    }
+
+    if (!(([str] >= 'a' && [str] <= 'z') || ([str] >= 'A' && [str] <= 'Z'))) {
+        return 0
+    }
+
+    :i
+    for i (1, length) {
+        if (!(([str+i] >= 'a' && [str+i] <= 'z') || ([str+i] >= 'A' && [str+i] <= 'Z') || ([str+i] >= '0' && [str+i] <= '9') || [str+i] == '_')) {
+            return 0
+        }
+    }
+
+    return 1
+}
+
+func get_variable([str], length) {
+    : [var] = g_var_tail
+
+    while (var) {
+        if (issamestr(str, length, var_s[var].name)) {
+            return var
+        }
+        var = var_s[var].prev
+    }
+    return NULL
+}
+
+func get_variable_or_create([str], length) {
+    : [var] = get_variable(str, length)
+    if (var) {
+        return var
+    }
+
+    // variable not found, create a new one
+    var = malloc(sizeof(var_s))
+
+    var_s[var].name = strndup(str, length)
+    var_s[var].type = VAR_NUMBER
+    var_s[var].value = 0
+    var_s[var].prev = g_var_tail
+    g_var_tail = var
+
+    return var
+}
+
+func check_goto_label([str], [length], pos) {
+    if ([length] == 0 || [str] != '[') {
+        return 0
+    }
+
+    : i = 1
+    while (i < [length] && [str+i] != ']') {
+        i++
+    }
+
+    // found a label
+    if (!isnumber(str + 1, i - 1)) {
+        printf("Error: invalid label number: '%S'\n", str + 1, i - 1)
+        return 0
+    }
+
+    : label_num = atoi(str + 1)
+    if (label_num >= 100) {
+        printf("Error: label number out of range: %d\n", label_num)
+        return 0
+    }
+
+    [g_goto_table + label_num] = pos // mark label as used
+    [length] = [length] - (i + 1)
+
+    return i + 1 // return the number of characters to skip
+}
+
+func find_matching_parenthesis([str], length) {
+    : open_parens = 1
+    : end = 0
+
+    while (end < length && open_parens > 0) {
+        if ([str + end] == '(') {
+            open_parens++
+        } elif ([str + end] == ')') {
+            open_parens--
+        }
+        end++
+    }
+    if (open_parens != 0) {
+        return 0
+    }
+    return end
+}
+
+func print_word([word]) { // word_s[word]
+    :i
+
+    if (word_s[word].type >= WORD_FIRST_INST) {
+        printf("( ")
+    }
+
+    if (word_s[word].type == WORD_NONE) {
+        printf("None ")
+    } elif (word_s[word].type == WORD_VAR) {
+        printf("%s ", var_s[word_s[word].value].name)
+    } elif (word_s[word].type == WORD_STR) {
+        printf("\"%s\" ", word_s[word].value)
+    } elif (word_s[word].type == WORD_NUM) {
+        printf("%d ", word_s[word].value)
+    } else {
+        for i (0, INTMAX, sizeof(instruction_s)) {
+            if (i / sizeof(instruction_s) > INSTRCTIONS_COUNT) {
+                printf("[type: %d] ", word_s[word].type)
+                break
+            }
+            if (instruction_s[g_instructions + i].type == word_s[word].type) {
+                printf("%s ", instruction_s[g_instructions + i].name)
+                break
+            }
+        }
+    }
+
+    if (word_s[word].type < WORD_FIRST_INST) {
+        return
+    }
+
+    i = 0
+    while (word_s[word_s[word].value + i].type != WORD_NONE) {
+        print_word(word_s[word].value + i)
+        i = i + sizeof(word_s)
+    }
+    printf(") ")
+}
+
+func parse_str([str], length, [word]) { // word_s[word]
+    while (length > 0 && ([str] == ' ')) {
+        str++
+        length--
+    }
+
+    printf("parsing: %S\n", str, length)
+
+    : end = tok_end(str, length)
+
+    if (end == 0) {
+        printf("Error: empty instruction\n")
+        return NULL
+    }
+
+    : expected_args = 0
+    : type = 0
+
+    if (end > 1 && [str] == '"' && [str + end - 1] == '"') {
+        if (word == NULL) {
+            word = new_word(1)
+        }
+        word_s[word].type = WORD_STR
+        word_s[word].value = strndup(str + 1, end - 2)
+        return word
+    } elif (isnumber(str, end)) {
+        if (word == NULL) {
+            word = new_word(1)
+        }
+        word_s[word].type = WORD_NUM
+        word_s[word].value = atoi(str)
+        return word
+    }
+
+    : [preloaded_word] = alloca(sizeof(word_s))
+    word_s[preloaded_word].type = WORD_NONE
+
+    :i
+    for i (0, INSTRCTIONS_COUNT * sizeof(instruction_s), sizeof(instruction_s)) {
+        if (issamestr(str, end, instruction_s[g_instructions + i].name)) {
+            type = instruction_s[g_instructions + i].type
+            expected_args = instruction_s[g_instructions + i].argc
+            break
+        }
+    }
+
+    if (type == 0) {
+        : debut = end
+        while (debut < length && [str + debut] == ' ') {
+            debut++
+        }
+        if (debut < length && [str + debut] == '=') {
+            if (!is_valid_var_name(str, end)) {
+                printf("Error: invalid variable name: '%S'\n", str, end)
+                return NULL
+            }
+            type = WORD_INST_LET
+            expected_args = 2
+            word_s[preloaded_word].type = WORD_VAR
+            word_s[preloaded_word].value = get_variable_or_create(str, end)
+            end = debut + 1 // skip '='
+        } elif (get_variable(str, end) != NULL) {
+            if (word == NULL) {
+                word = new_word(1)
+            }
+            word_s[word].type = WORD_VAR
+            word_s[word].value = get_variable(str, end)
+            return word
+        } else {
+            printf("Error: unknown instruction: '%S'\n", str, end)
+            return NULL
+        }
+    }
+
+    str = str + end
+    length = length - end
+
+    if (word == NULL) {
+        word = new_word(1)
+    }
+    word_s[word].value = new_word(expected_args + 1)
+
+    word_s[word].type = type
+    word_s[word_s[word].value + expected_args].type = WORD_NONE
+
+    : argc = 0
+    if (word_s[preloaded_word].type != WORD_NONE) {
+        memmov(word_s[word].value, preloaded_word, sizeof(word_s))
+        argc++
+    }
+
+    while (argc < expected_args) {
+        while (length > 0 && ([str] == ' ')) {
+            str++
+            length--
+        }
+
+        if (length == 0) {
+            if (expected_args >= VAARG_FUNC) {
+                // variable number of arguments
+                instruction_s[[word_s[word].value + (argc * sizeof(word_s))]].type = WORD_NONE
+                return word
+            }
+            printf("Error: not enough arguments\n")
+            return NULL
+        }
+
+        : have_parentheses = 0
+        if ([str] == '(') {
+            have_parentheses = 1
+            str++
+            length--
+            end = find_matching_parenthesis(str, length)
+            if (end == 0) {
+                printf("Error: unclosed parentheses\n")
+                return NULL
+            }
+            if (end == 1) {
+                printf("Error: empty parentheses\n")
+                return NULL
+            }
+        } else {
+            end = tok_end(str, length)
+        }
+
+        : [arg]
+        if (have_parentheses) {
+            arg = parse_str(str, end - 1, word_s[word].value + (argc * sizeof(word_s)))
+        } else {
+            arg = parse_str(str, length, word_s[word].value + (argc * sizeof(word_s)))
+            if (arg && word_s[arg].type >= WORD_FIRST_INST) {
+                if (expected_args != argc + 1 && expected_args < VAARG_FUNC) {
+                    printf("Error: wrong number of arguments %d, expected %d\n", argc + 1, expected_args)
+                    return NULL
+                }
+                end = length
+            }
+        }
+
+        if (!arg) {
+            return NULL
+        }
+
+        str = str + end
+        length = length - end
+
+        argc++
+    }
+
+    while (length > 0 && ([str] == ' ')) {
+        str++
+        length--
+    }
+
+    if (length == 0) {
+        return word
+    }
+
+    printf("Error: too many arguments\n")
+    return NULL
+}
+
+
+
+// func execute_word(word_s *word, word_s *return_value) {
+//     if (return_value) {
+//         return_value->type = WORD_NONE
+//     }
+//     word_s args[10]
+//     int argc = 0
+//     for ( word_s[word].value[argc].type != WORD_NONE argc++) {
+//         if (argc >= 10) {
+//             printf("Error: too many arguments\n")
+//             return EXEC_ERROR
+//         }
+//         if (word_s[word].value[argc].type == WORD_VAR) {
+//             if (word_s[word].type == WORD_INST_LET) {
+//                 args[argc] = word_s[word].value[argc]
+//             } else {
+//                 if (word_s[word].value[argc].var_ptr->type == VAR_STRING) {
+//                     args[argc].type = WORD_STR
+//                     args[argc].str = word_s[word].value[argc].var_ptr->value.str
+//                 } else {
+//                     args[argc].type = WORD_NUM
+//                     args[argc].num = word_s[word].value[argc].var_ptr->value.num
+//                 }
+//             }
+//         } else if (word_s[word].value[argc].type < WORD_FIRST_INST) {
+//             args[argc] = word_s[word].value[argc]
+//         } else if (word_s[word].type != WORD_INST_IF || argc != 1) {
+//             int a = execute_word(word_s[word].value + argc, args + argc)
+//             if (a != EXEC_CONTINUE) {
+//                 return a
+//             }
+//         }
+//     }
+// 
+//     switch (word_s[word].type) {
+//         case WORD_INST_PRINT:
+//             for (int i = 0 i < argc i++) {
+//                 switch (args[i].type) {
+//                     case WORD_STR:
+//                         printf("%s", args[i].str)
+//                         break
+//                     case WORD_NUM:
+//                         printf("%d", args[i].num)
+//                         break
+//                     case WORD_NONE:
+//                         printf("None")
+//                         break
+//                     default:
+//                         printf("[type: %d]", args[i].type)
+//                         break
+//                 }
+//                 if (i < argc - 1) {
+//                     printf(" ")
+//                 }
+//             }
+//             printf("\n")
+//             break
+//         case WORD_INST_LEN:
+//             if (args[0].type == WORD_STR) {
+//                 if (return_value) {
+//                     return_value->type = WORD_NUM
+//                     return_value->num = strlen(args[0].str)
+//                 }
+//             } else {
+//                 printf("Error: LEN expects a string argument\n")
+//                 return EXEC_ERROR
+//             }
+//             break
+//         case WORD_INST_STOP:
+//             return EXEC_END
+//         case WORD_INST_LET:
+//             if (args[0].type != WORD_VAR) {
+//                 printf("Error: LET expects a variable as first argument\n")
+//                 return EXEC_ERROR
+//             }
+//             if (args[1].type == WORD_STR) {
+//                 args[0].var_ptr->type = VAR_STRING
+//                 args[0].var_ptr->value.str = strdup(args[1].str)
+//             } else if (args[1].type == WORD_NUM) {
+//                 args[0].var_ptr->type = VAR_NUMBER
+//                 args[0].var_ptr->value.num = args[1].num
+//             } else {
+//                 printf("Error: LET expects a string or number as second argument\n")
+//                 return EXEC_ERROR
+//             }
+//             break
+//         case WORD_INST_THEN:
+//             // arguments are already executed, nothing to do here
+//             break
+//         case WORD_INST_IF:
+//             if ((args[0].type == WORD_NUM && args[0].num) || (args[0].type == WORD_STR && arg[s[0])) {
+//                 int a = execute_word(word_s[word].value + 1, NULL)
+//                 if (a != EXEC_CONTINUE) {
+//                     return a
+//                 }
+//             }
+//             break
+//         case WORD_INST_GOTO:
+//             if (args[0].type != WORD_NUM) {
+//                 printf("Error: GOTO expects a number argument\n")
+//                 return EXEC_ERROR
+//             }
+//             if (args[0].num < 0 || args[0].num >= 100 || g_goto_table[args[0].num] == 0xFFFF) {
+//                 printf("Error: GOTO label %d does not exist\n", args[0].num)
+//                 return EXEC_ERROR
+//             }
+//             return g_goto_table[args[0].num]
+//         case WORD_INST_LT:
+//             if (args[0].type != WORD_NUM || args[1].type != WORD_NUM) {
+//                 printf("Error: < expects two number arguments\n")
+//                 return EXEC_ERROR
+//             }
+//             if (return_value) {
+//                 return_value->type = WORD_NUM
+//                 return_value->num = args[0].num < args[1].num
+//             }
+//             break
+//         case WORD_INST_PLUS:
+//             if (args[0].type != WORD_NUM || args[1].type != WORD_NUM) {
+//                 printf("Error: + expects two number arguments\n")
+//                 return EXEC_ERROR
+//             }
+//             if (return_value) {
+//                 return_value->type = WORD_NUM
+//                 return_value->num = args[0].num + args[1].num
+//             }
+//             break
+//         default:
+//             printf("Error: unknown instruction type: %d\n", word_s[word].type)
+//             return EXEC_ERROR
+//     }
+//     return EXEC_CONTINUE
+// }
+
+func free_variable_list([var]) {
+    while (var) {
+        : prev = var_s[var].prev
+        if (var_s[var].type == VAR_STRING) {
+            free(var_s[var].value)
+        }
+        free(var_s[var].name)
+        free(var)
+        var = prev
+    }
+}
+
+func main() {
+    :i
+
+    // char *program =
+    //         "age = 100\n"
+    //         "IF (< age 18) GOTO 1\n"
+    //         "PRINT \"You are an adult.\"\n"
+    //         "STOP\n"
+    //         "[1] PRINT \"You are a minor.\"\n"*/
+
+    : program = "i = 123\n[1] i = + i 1\nPRINT i\nIF (< i 10) GOTO 1\n"
+
+    // char *program =
+    //        "coucou = \"hi!\"\n"
+    //        "PRINT \"Hello\" (LEN \"oui\") coucou\n"
+    //        "PRINT 1 LEN \"hi\"\n"
+    //        "IF 1 THEN (PRINT \"if is true\") (PRINT 123)\n"*/
+
+    // split program into lines
+    : [lines] = alloca(sizeof(word_s) * 10)
+    : line_count = 0
+
+    // printf("dd%d\n", [program])
+
+    while ([program]) {
+        : end = line_end(program, strlen(program))
+
+        if (end == 0) {
+            break
+        }
+
+        printf("Line: %S\n", program, end)
+
+        program = program + check_goto_label(program, &end, line_count)
+        [lines + line_count] = parse_str(program, end, NULL)
+
+        if ([lines + line_count] == NULL) {
+            printf("Error parsing instruction: %S\n", program, end)
+            return 1
+        }
+
+        line_count++
+        program = program + end + 1
+    }
+
+    printf("\n") 
+    for i (0, line_count) {
+        print_word([lines + i])
+        printf("\n")
+    }
+
+    // printf("Executing program...\n")
+
+    // for i (0, line_count) {
+    //     : a = execute_word(lines[i], NULL)
+    //     
+    //     if (a == EXEC_ERROR) {
+    //         return 1
+    //     } else if (a == EXEC_END) {
+    //         break
+    //     } else if (a != EXEC_CONTINUE) {
+    //         i = a
+    //     } else {
+    //         i++
+    //     }
+    // }
+
+    // free_variable_list(g_var_tail)
+}
+
+malloc_init(0x10, 0x2000, 16)
+main()
+
+while (1) {
+    out(0x1031, 1)
+}

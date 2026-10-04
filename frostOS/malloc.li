@@ -16,21 +16,17 @@ g_nbitshift = array(65534, 65533, 65531, 65527, 65519, 65503, 65471, 65407, 6527
 #define malloc_data madata[g_malloc_data]
 #define MALLOC_MAGIC 0xDEAD
 
-func needed_to_index(size, block_size) {
-    return (size - 1) / (16 * block_size) + 1
-}
+#define calc_index_size(size, block_size) (((size) - 1) / (16 * (block_size)) + 1)
 
-
-func init_malloc(debut, size, block_size) {
+func malloc_init(debut, size, block_size) {
     : tmp needed = 0
 
-    tmp = needed_to_index(size, block_size)
+    tmp = calc_index_size(size, block_size)
 
     while (tmp != needed) {
         needed = tmp
-        tmp = needed_to_index(size - tmp, block_size)
+        tmp = calc_index_size(size - tmp, block_size)
     }
-    dump(needed)
 
     memset(debut, 0, needed)
 
@@ -84,12 +80,17 @@ func malloc(size) {
             return addr
         }
     }
+
+    dump(1234)
+    return 0
 }
 
 func free(addr) {
     : debut_addr
     : debut_index
     : size i j
+
+    dump(addr)
 
     addr = addr - 2
     if ([addr] != MALLOC_MAGIC) {
@@ -115,20 +116,3 @@ func free(addr) {
         debut_index = 0
     }
 }
-
-init_malloc(0, 0x1000, 1)
-
-func test_malloc() {
-    : a = malloc(10)
-    : b = malloc(1)
-
-    dump(a)
-    dump(b)
-
-    free(a)
-
-    a = malloc(4)
-    dump(a)
-}
-
-test_malloc()
