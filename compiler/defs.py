@@ -160,17 +160,19 @@ OPCODES = [
     opcode("and",    0x0F, 2),
     opcode("band",   0x10, 2),
     opcode("bor",    0x11, 2),
-    opcode("jmp",    0x12, 2),
-    opcode("jmpr",   0x13, 2),
-    opcode("out",    0x14, 2),
-    opcode("in",     0x15, 2),
-    opcode("ssp",    0x16, 1),
-    opcode("sup",    0x17, 1),
-    opcode("mss",    0x18, 4),
-    opcode("pushs",  0x19, 2),
-    opcode("pops",   0x1A, 2),
-    opcode("memset", 0x1B, 3),
-    opcode("memmov", 0x1C, 3),
+    opcode("bnot",   0x12, 1),
+    opcode("bshl",   0x13, 2),
+    opcode("bshr",   0x14, 2),
+    opcode("jmp",    0x15, 2),
+    opcode("jmpr",   0x16, 2),
+    opcode("out",    0x17, 2),
+    opcode("in",     0x18, 2),
+    opcode("ssp",    0x19, 1),
+    opcode("sup",    0x1A, 1),
+    opcode("load",   0x1B, 2),
+    opcode("pops",   0x1C, 2),
+    opcode("memset", 0x1D, 3),
+    opcode("memmov", 0x1E, 3),
     opcode("hlt",    0xFF, 0),
 ]
 
@@ -215,21 +217,19 @@ def get_operator(opr):
 
 MEMORY_SIZE = 65536 - (80 * 25)
 
-MAGIC_NUMBER = 0xF057
-ARCH_VERSION = 0x0100
-
 CHARS_SPE = [",", ".", "(", ")", ":", "=", "{", "}", "[", "]", "$", "!", "//", "' '", "#"]
 CHARS_OPR = [e.name for e in OPERATORS]
 CHARS_SPE += CHARS_OPR
 
-KEYWORDS = ["if", "elif", "else", "while", "func", "vafunc", "return", "break", "continue", "for", "sub", "asm", "struct"]
+KEYWORDS = ["if", "elif", "else", "while", "func", "vafunc", "return", "break", "continue", "for", "sub", "asm", "struct", "switch", "case", "default"]
 
-COND_RES_ADDR   = MEMORY_SIZE - 1
-FUNC_RET_ADDR   = MEMORY_SIZE - 2
-STACK_DEBUT_PTR = MEMORY_SIZE - 3
-STACK_PTR       = MEMORY_SIZE - 4
+LLC_TEMP_ADDR   = MEMORY_SIZE - 1
+COND_RES_ADDR   = MEMORY_SIZE - 2
+FUNC_RET_ADDR   = MEMORY_SIZE - 3
+STACK_DEBUT_PTR = MEMORY_SIZE - 4
+STACK_PTR       = MEMORY_SIZE - 5
 
-STATIC_ADDR     = MEMORY_SIZE - 4 # will be decremented as static variables / strings are added
+STATIC_ADDR     = MEMORY_SIZE - 5 # will be decremented as static variables / strings are added
 STATIC_BYTES    = bytearray()
 
 CURRENT_SCOPE = "global"

@@ -1,0 +1,26 @@
+: i test = 0
+
+for i (0, 6) {
+    switch i {
+        case 1 {
+            dump(123)
+        }
+        case 2 {
+            dump(test)
+            test++
+
+            if test < 5 {
+                continue // goto to "case 2"
+            }
+        }
+        case 3, 4 {
+            dump(34)
+        }
+        case 7 {
+            dump(7) // never reached
+        }
+        default {
+            dump(789)
+        }
+    }
+}

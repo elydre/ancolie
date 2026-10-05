@@ -102,12 +102,7 @@ struct word_s {
     : value // union { word [value], var_s [var_ptr], [str], num }
 }
 
-struct program_s {
-    : [variables] // var_s
-    : [lines]     // word_s
-}
-
-struct instruction_s {
+struct inst_s {
     : type
     : [name]
     : argc
@@ -303,13 +298,13 @@ func print_word([word]) { // word_s[word]
     } elif (word_s[word].type == WORD_NUM) {
         printf("%d ", word_s[word].value)
     } else {
-        for i (0, INTMAX, sizeof(instruction_s)) {
-            if (i / sizeof(instruction_s) > INSTRCTIONS_COUNT) {
+        for i (0, INTMAX, sizeof(inst_s)) {
+            if (i / sizeof(inst_s) > INSTRCTIONS_COUNT) {
                 printf("[type: %d] ", word_s[word].type)
                 break
             }
-            if (instruction_s[g_instructions + i].type == word_s[word].type) {
-                printf("%s ", instruction_s[g_instructions + i].name)
+            if (inst_s[g_instructions + i].type == word_s[word].type) {
+                printf("%s ", inst_s[g_instructions + i].name)
                 break
             }
         }
@@ -365,10 +360,10 @@ func parse_str([str], length, [word]) { // word_s[word]
     word_s[preloaded_word].type = WORD_NONE
 
     :i
-    for i (0, INSTRCTIONS_COUNT * sizeof(instruction_s), sizeof(instruction_s)) {
-        if (issamestr(str, end, instruction_s[g_instructions + i].name)) {
-            type = instruction_s[g_instructions + i].type
-            expected_args = instruction_s[g_instructions + i].argc
+    for i (0, INSTRCTIONS_COUNT * sizeof(inst_s), sizeof(inst_s)) {
+        if (issamestr(str, end, inst_s[g_instructions + i].name)) {
+            type = inst_s[g_instructions + i].type
+            expected_args = inst_s[g_instructions + i].argc
             break
         }
     }
@@ -427,7 +422,7 @@ func parse_str([str], length, [word]) { // word_s[word]
         if (length == 0) {
             if (expected_args >= VAARG_FUNC) {
                 // variable number of arguments
-                instruction_s[[word_s[word].value + (argc * sizeof(word_s))]].type = WORD_NONE
+                inst_s[[word_s[word].value + (argc * sizeof(word_s))]].type = WORD_NONE
                 return word
             }
             printf("Error: not enough arguments\n")

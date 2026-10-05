@@ -173,7 +173,7 @@ def compile_line(lines: list, labels: tuple, tree: list):
                 else:
                     val = None
 
-                addr = out.get_static_addr(1, [val if val else 0])
+                addr = out.push_static_data([val if val else 0])
                 defs.variable(var_name, ptrlvl, addr, is_static = True).add()
 
                 if val is not None:
@@ -414,7 +414,7 @@ def compile_line(lines: list, labels: tuple, tree: list):
                     (0, defs.COND_RES_ADDR), (3, utl.to_u16(-v.offset)))
             output.add("lt",
                     (0, defs.COND_RES_ADDR), (2, 0))
-            
+
             output.add_goto(
                     fin_label, (0, defs.COND_RES_ADDR)) # jump if the condition is false
 
@@ -589,6 +589,112 @@ def compile_line(lines: list, labels: tuple, tree: list):
 
         return (output, closing_line + 1)
 
+    elif tokens[0] == "switch":
+        if len(tokens) < 2:
+            utl.say_error("Bad syntax", correct_syntax = "switch var")
+
+        # calculate the expression to switch on
+        val = op.calculate_expr(tokens[1:])
+
+        end_label = utl.get_new_label()
+        default_label = end_label
+
+        # find the case and default blocks
+        closing_line = toks.locate_braces(lines)
+        case_lines = lines[2:closing_line]
+
+        current_line = 0
+        size = len(case_lines)
+
+        case_labels = {} # value: label
+
+        sub_output = out.output_code()
+
+        while current_line < size:
+            defs.CURRENT_LNO, tokens = case_lines[current_line]
+
+            if len(tokens) == 0:
+                current_line += 1
+                continue
+
+            if tokens[0] == "case":
+                args = toks.split_func_args(tokens[1:])
+                case_label = utl.get_new_label()
+
+                for arg in args:
+                    if len(arg) != 1:
+                        utl.say_error("Bad syntax", correct_syntax = "case 123, 456 { ... }")
+                    arg = arg[0]
+
+                    if not (utl.is_number(arg) or utl.is_char(arg)):
+                        utl.say_error(f"Case value must be a number or a character, got '{arg}'")
+
+                    case_value = utl.to_number(arg)
+
+                    if case_value > conf.MAX_CASE_VAL:
+                        utl.say_error(f"Case value exceeds maximum allowed: {case_value} > {conf.MAX_CASE_VAL}")
+
+                    if case_value in case_labels:
+                        utl.say_error(f"Duplicate case value: {case_value}")
+
+                    case_labels[case_value] = case_label
+
+                # compile the lines inside the case block
+                closing_case_line = toks.locate_braces(case_lines, current_line)
+                sub_output.add_label(case_label)
+                sub_output.atend(compile_lines(case_lines[current_line + 2:closing_case_line], (case_label, end_label), new_tree))
+
+                # add unconditional jump to the end of the switch block
+                sub_output.add_goto(end_label, (1, 0))
+
+                current_line = closing_case_line + 1
+
+            elif tokens[0] == "default":
+                if len(tokens) != 1:
+                    utl.say_error("Nothing expected after default keyword", correct_syntax = "default { ... }")
+
+                if default_label != end_label:
+                    utl.say_error("Duplicate default block")
+
+                default_label = utl.get_new_label()
+
+                # compile the lines inside the default block
+                closing_default_line = toks.locate_braces(case_lines, current_line)
+                sub_output.add_label(default_label)
+                sub_output.atend(compile_lines(case_lines[current_line + 2:closing_default_line], (default_label, end_label), new_tree))
+
+                current_line = closing_default_line + 1
+
+        if len(case_labels) == 0:
+            utl.say_error("Switch statement must have at least one case")
+
+        # fill the table of case values and labels
+        case_table = [default_label] * (max(case_labels.keys()) + 1)
+        for value, label in case_labels.items():
+            case_table[value] = label
+
+        tab_addr = out.push_static_labels(case_table)
+
+        # compare the switch value with the case values
+        output.atend(val)
+
+        # check if the value is in range
+        output.add("pop", (0, defs.LLC_TEMP_ADDR))
+
+        output.add("mov", (0, defs.COND_RES_ADDR), (0, defs.LLC_TEMP_ADDR))
+        output.add("lt", (0, defs.COND_RES_ADDR), (1, len(case_table)))
+        output.add_goto(default_label, (0, defs.COND_RES_ADDR))
+
+        # get the address of the case label from the table
+        output.add("load", (0, defs.LLC_TEMP_ADDR), (1, tab_addr))
+        output.add("jmp", (0, defs.LLC_TEMP_ADDR), (1, 0)) # jump to the case label
+
+        output.atend(sub_output)
+
+        output.add_label(end_label)
+
+        return (output, closing_line + 1)
+
     elif tokens[0] == "break":
         if not labels:
             utl.say_error(f"Unexpected break statement outside of a loop")
@@ -631,6 +737,9 @@ def compile_line(lines: list, labels: tuple, tree: list):
 
     elif tokens[0] in ("else", "elif"):
         utl.say_error(f"Unexpected {tokens[0]} statement outside of an if block", correct_syntax = "if var == 0 { ... } elif var == 1 { ... } else { ... }")
+
+    elif tokens[0] in ("case", "default"):
+        utl.say_error(f"Unexpected {tokens[0]} statement outside of a switch block", correct_syntax = "switch var { case 1 { ... } case 2 { ... } default { ... } }")
 
     elif tokens[0] in defs.CHARS_SPE:
         utl.say_error(f"Unexpected character: '{tokens[0]}'")

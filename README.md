@@ -43,6 +43,7 @@ gcc -DGUI -o emulator emulator.c -lSDL2
 - [x] structs
 - [x] preprocessor
 - [x] infix expressions
+- [x] switch statements
 - [ ] heap arrays
 - [ ] multiple source files
 
@@ -51,7 +52,7 @@ gcc -DGUI -o emulator emulator.c -lSDL2
 - [x] C emulator
 - [x] basic command line interface for compiler
 - [x] add screen to the emulator
-- [ ] langage documentation *- in progress*
+- [x] langage documentation
 - [ ] create a basic operating system *- in progress*
 
 ## ancolie language
@@ -161,6 +162,29 @@ asm {
 
     pop 0               // restore the stack
 }
+
+/* C-like preprocessor is available with the `#` symbol.
+** It can be used to define constants and include files.
+*/
+#include "file.li"   // include another ancolie file
+#define PI 3.14                 // define a constant
+#define SQUARE(x) ((x) * (x))   // define a macro
+
+/* Switch statements are available with the `switch` keyword.
+** They can be used to execute different code based on a value.
+*/
+switch var {
+    case 1 {
+        // code for case 1
+        // break is not required
+    }
+    case 2 {
+        // code for case 2
+    }
+    default {
+        // code for default case
+    }
+}
 ```
 
 ### Built-in functions
@@ -213,22 +237,25 @@ opcode (8 bit)  sources (4 * 2bit)  [  arg0 (16 bit)   ] ... [ arg3 (16 bit)    
 | `0x0F` |  and   | `a` `b`     | `a <- a && b`              |
 | `0x10` |  band  | `a` `b`     | `a <- a & b`               |
 | `0x11` |  bor   | `a` `b`     | `a <- a bor b` (md sorry)  |
+| `0x12` |  bnot  | `a`         | `a <- ~a`                  |
 |        |        |             |                            |
-| `0x12` |  jmp   | `a` `b`     | `pc  = a if b == 0`        |
-| `0x13` |  jmpr  | `a` `b`     | `pc += a if b == 0`        |
+| `0x13` |  bshl  | `a` `b`     | `a <- a << b`              |
+| `0x14` |  bshr  | `a` `b`     | `a <- a >> b`              |
 |        |        |             |                            |
-| `0x14` |  out   | `port` `a`  | output `a` to `port`       |
-| `0x15` |  in    | `a` `port`  | input from `port` to `a`   |
+| `0x15` |  jmp   | `a` `b`     | `pc  = a if b == 0`        |
+| `0x16` |  jmpr  | `a` `b`     | `pc += a if b == 0`        |
 |        |        |             |                            |
-| `0x16` |  ssp   | `a`         | `sp <- a`                  |
-| `0x17` |  sup   | `a`         | `up <- a`                  |
+| `0x17` |  out   | `port` `a`  | output `a` to `port`       |
+| `0x18` |  in    | `a` `port`  | input from `port` to `a`   |
 |        |        |             |                            |
-| `0x18` |  mss   | `A` `a` `B` `b` | `[A + a] <- [B + b]`   |
-| `0x19` |  pushs | `A` `a`     | `sp--`, `[sp] <- [A + a]`  |
-| `0x1A` |  pops  | `A` `a`     | `[A + a] <- [sp]`, `sp++`  |
+| `0x19` |  ssp   | `a`         | `sp <- a`                  |
+| `0x1A` |  sup   | `a`         | `up <- a`                  |
 |        |        |             |                            |
-| `0x1B` | memset | `a` `b` `c` | `memset(addr=a val=b s=c)` |
-| `0x1C` | memmov | `a` `b` `c` | `memmov(dest=a src=b s=c)` |
+| `0x1B` |  load  | `a` `b`     | `[a] <- [a + b]`           |
+| `0x1C` |  pops  | `a` `b`     | `[a + b] <- [sp]`, `sp++`  |
+|        |        |             |                            |
+| `0x1D` | memset | `a` `b` `c` | `memset(addr=a val=b s=c)` |
+| `0x1E` | memmov | `a` `b` `c` | `memmov(dest=a src=b s=c)` |
 |        |        |             |                            |
 | `0xFF` |  hlt   |             | halt the computer          |
 

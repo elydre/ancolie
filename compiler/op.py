@@ -224,9 +224,7 @@ def calculate_expr(rpn: list, is_infix: bool = True):
             output.atend(o)
 
             # load the value from the pointer's address
-            output.add("mss",
-                    (0, defs.STACK_PTR), (1, 0),
-                    (2, 0), (1, 0))
+            output.add("load", (2, 0), (1, 0))
 
             stack_size += 1
 
@@ -236,9 +234,7 @@ def calculate_expr(rpn: list, is_infix: bool = True):
             output.atend(o)
 
             # load the value from the pointer's address
-            output.add("mss",
-                    (0, defs.STACK_PTR), (1, 0),
-                    (2, 0), (1, 0))
+            output.add("load", (2, 0), (1, 0))
 
             stack_size += 1
 
@@ -274,11 +270,9 @@ def calculate_expr(rpn: list, is_infix: bool = True):
         elif utl.is_string(token):
             converted_string = utl.convert_string(token)
 
-            addr = out.get_static_addr(len(converted_string), converted_string)
-            output.add("push",
-                    (1, addr))
+            addr = out.push_static_data(converted_string)
+            output.add("push", (1, addr))
             stack_size += 1
-
 
         elif token in defs.CHARS_OPR:
             if last_number is not None:
@@ -322,14 +316,10 @@ def calculate_expr(rpn: list, is_infix: bool = True):
             elif token == '!':
                 output.add("eq", b, (1, 0))
                 stack_size += 1 # noting consumed
-            elif token == '>>':
-                if last_number is None:
-                    utl.say_error(f"Bitshift operator requires a number as second operand")
-                output.add("div", a, (1, 2 ** last_number))
             elif token == '<<':
-                if last_number is None:
-                    utl.say_error(f"Bitshift operator requires a number as second operand")
-                output.add("mul", a, (1, 2 ** last_number))
+                output.add("bshl", a, b)
+            elif token == '>>':
+                output.add("bshr", a, b)
             else:
                 utl.say_error(f"Unknown operator in expression: {token}", internal=True)
 
@@ -483,7 +473,7 @@ def call_func(f: defs.func, tokens: list, dest = None):
 
         output.add("push",
                 (1, utl.to_u16(len(args))))
-        output.add("push", # TODO check if this is not eq to STACK_DEBUT_PTR
+        output.add("push",
                 (0, defs.STACK_PTR))
         output.add("add",
                 (2, 0), (1, 3))

@@ -1,23 +1,26 @@
+import compiler.config as conf
 import compiler.utils as utl
 import compiler.defs as defs
 
-
-def get_static_addr(size: int, data: list = None):
-    if data == None:
-        data = [0] * size
-    elif len(data) != size:
-        utl.say_error(f"Data size mismatch in get_static_addr\nExpected {size}, got {len(data)}", internal=True)
-
+def push_static_data(data: list):
     byte_data = bytearray()
     for d in data:
         if type(d) != int or d < 0 or d > 0xFFFF:
-            utl.say_error(f"Invalid data value in get_static_addr\nExpected int in range [0, 65535], got {d}", internal=True)
+            utl.say_error(f"Invalid data value in push_static_data\nExpected int in range [0, 65535], got {d}", internal=True)
         byte_data += d.to_bytes(2, byteorder='little')
 
-    defs.STATIC_ADDR -= size
+    defs.STATIC_ADDR -= len(data)
     defs.STATIC_BYTES = byte_data + defs.STATIC_BYTES
 
     return defs.STATIC_ADDR
+
+to_resolve_labels = [] # TODO: it's a bit ugly
+
+def push_static_labels(labels: list):
+    addr = push_static_data([0] * len(labels))
+    for i, label in enumerate(labels):
+        to_resolve_labels.append((addr + i, label))
+    return addr
 
 
 class output_file:
@@ -40,8 +43,8 @@ class output_file:
 
     def write(self, file):
         header = bytearray()
-        header += defs.MAGIC_NUMBER.to_bytes(2, byteorder='little')
-        header += defs.ARCH_VERSION.to_bytes(2, byteorder='little')
+        header += conf.MAGIC_NUMBER.to_bytes(2, byteorder='little')
+        header += conf.ARCH_VERSION.to_bytes(2, byteorder='little')
         header += len(self.sections).to_bytes(2, byteorder='little')
 
         # update debut values
@@ -253,16 +256,25 @@ class output_code:
             if instr.type == self.instruction.TYPE_GOTO:
                 resolved_address = label_addresses.get(instr.goto_label)
                 if resolved_address is None:
-                    utl.say_error(f"Unknown label: {instr.goto_label}", internal=True)
+                    utl.say_error(f"Unknown goto label: {instr.goto_label}", internal=True)
                 # replace the goto instruction with a jmp instruction
                 instr.setopcode("jmp", (1, resolved_address), instr.goto_val, None, None)
 
             elif instr.type == self.instruction.TYPE_PUSH_LABEL:
                 resolved_address = label_addresses.get(instr.goto_label)
                 if resolved_address is None:
-                    utl.say_error(f"Unknown label: {instr.goto_label}", internal=True)
+                    utl.say_error(f"Unknown pushed label: {instr.goto_label}", internal=True)
                 # replace the push_label instruction with a push instruction
                 instr.setopcode("push", (1, resolved_address), None, None, None)
+
+        # resolve static labels
+        for addr, label in to_resolve_labels:
+            resolved_address = label_addresses.get(label)
+            if resolved_address is None:
+                utl.say_error(f"Unknown label for static data: {label}", internal=True)
+            # update the static data at the given address
+            offset = (addr - defs.STATIC_ADDR) * 2
+            defs.STATIC_BYTES[offset:offset+2] = resolved_address.to_bytes(2, byteorder='little')
 
     def to_bytes(self):
         code_bytes = bytearray()
