@@ -276,11 +276,10 @@ def compile_line(lines: list, labels: tuple, tree: list):
         output.atend(inner_output)
 
         # check if there is an elif or else block after the if block
-        next_line = None
+        next_tokens = None
         while closing_line + 1 < len(lines) and lines[closing_line + 1][1][0] in ("elif", "else"):
-            next_line = lines[closing_line + 1]
-            next_tokens = next_line[1]
-
+            defs.CURRENT_LNO, next_tokens = lines[closing_line + 1]
+            
             output.add_goto(
                 fin_label, (1, 0)) # unconditional jump to the end of the if block
             output.add_label(next_label)
@@ -326,7 +325,7 @@ def compile_line(lines: list, labels: tuple, tree: list):
             output.atend(inner_output)
 
 
-        if next_line is None:
+        if next_tokens is None:
             output.add_label(next_label)
         else:
             output.add_label(fin_label)

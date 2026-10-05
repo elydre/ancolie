@@ -102,7 +102,7 @@ def define(tokens_lines):
 
                 if e.args is None:
                     line[i:i + 1] = e.replacement_tokens
-                    i -= len(e.replacement_tokens) - 1
+                    i -= len(e.replacement_tokens)
                     continue
 
                 if line[i + 1] != "(":
@@ -126,7 +126,7 @@ def define(tokens_lines):
                             replacement_tokens[k:k + 1] = args[j]
 
                 line[i:closing_par + 1] = replacement_tokens
-                i -= len(replacement_tokens) - 1
+                i -= len(replacement_tokens)
 
         new_tokens_lines.append((lineno, line))
 
