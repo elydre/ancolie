@@ -1,6 +1,3 @@
-#define VAR_STRING 1
-#define VAR_NUMBER 2
-
 #define WORD_NONE 0
 #define WORD_VAR  1
 #define WORD_STR  2
@@ -24,6 +21,9 @@
 #define EXEC_END      0xFFFF
 #define EXEC_ERROR    0xFFFE
 #define EXEC_CONTINUE 0xFFFD
+
+#define VAR_STRING WORD_VAR
+#define VAR_NUMBER WORD_NUM
 
 // standard library
 $ screen_x
@@ -73,6 +73,10 @@ func strndup([str], length) {
     [new_str + length] = '\0'
 
     return new_str
+}
+
+func strdup([str]) {
+    return strndup(str, strlen(str))
 }
 
 func atoi([str]) {
@@ -282,46 +286,6 @@ func find_matching_parenthesis([str], length) {
     return end
 }
 
-func print_word([word]) { // word_s[word]
-    :i
-
-    if (word_s[word].type >= WORD_FIRST_INST) {
-        printf("( ")
-    }
-
-    if (word_s[word].type == WORD_NONE) {
-        printf("None ")
-    } elif (word_s[word].type == WORD_VAR) {
-        printf("%s ", var_s[word_s[word].value].name)
-    } elif (word_s[word].type == WORD_STR) {
-        printf("\"%s\" ", word_s[word].value)
-    } elif (word_s[word].type == WORD_NUM) {
-        printf("%d ", word_s[word].value)
-    } else {
-        for i (0, INTMAX, sizeof(inst_s)) {
-            if (i / sizeof(inst_s) > INSTRCTIONS_COUNT) {
-                printf("[type: %d] ", word_s[word].type)
-                break
-            }
-            if (inst_s[g_instructions + i].type == word_s[word].type) {
-                printf("%s ", inst_s[g_instructions + i].name)
-                break
-            }
-        }
-    }
-
-    if (word_s[word].type < WORD_FIRST_INST) {
-        return
-    }
-
-    i = 0
-    while (word_s[word_s[word].value + i].type != WORD_NONE) {
-        print_word(word_s[word].value + i)
-        i = i + sizeof(word_s)
-    }
-    printf(") ")
-}
-
 func parse_str([str], length, [word]) { // word_s[word]
     while (length > 0 && ([str] == ' ')) {
         str++
@@ -484,140 +448,196 @@ func parse_str([str], length, [word]) { // word_s[word]
     return NULL
 }
 
+func print_word([word]) { // word_s[word]
+    :i
 
+    if (word_s[word].type >= WORD_FIRST_INST) {
+        printf("( ")
+    }
 
-// func execute_word(word_s *word, word_s *return_value) {
-//     if (return_value) {
-//         return_value->type = WORD_NONE
-//     }
-//     word_s args[10]
-//     int argc = 0
-//     for ( word_s[word].value[argc].type != WORD_NONE argc++) {
-//         if (argc >= 10) {
-//             printf("Error: too many arguments\n")
-//             return EXEC_ERROR
-//         }
-//         if (word_s[word].value[argc].type == WORD_VAR) {
-//             if (word_s[word].type == WORD_INST_LET) {
-//                 args[argc] = word_s[word].value[argc]
-//             } else {
-//                 if (word_s[word].value[argc].var_ptr->type == VAR_STRING) {
-//                     args[argc].type = WORD_STR
-//                     args[argc].str = word_s[word].value[argc].var_ptr->value.str
-//                 } else {
-//                     args[argc].type = WORD_NUM
-//                     args[argc].num = word_s[word].value[argc].var_ptr->value.num
-//                 }
-//             }
-//         } else if (word_s[word].value[argc].type < WORD_FIRST_INST) {
-//             args[argc] = word_s[word].value[argc]
-//         } else if (word_s[word].type != WORD_INST_IF || argc != 1) {
-//             int a = execute_word(word_s[word].value + argc, args + argc)
-//             if (a != EXEC_CONTINUE) {
-//                 return a
-//             }
-//         }
-//     }
-// 
-//     switch (word_s[word].type) {
-//         case WORD_INST_PRINT:
-//             for (int i = 0 i < argc i++) {
-//                 switch (args[i].type) {
-//                     case WORD_STR:
-//                         printf("%s", args[i].str)
-//                         break
-//                     case WORD_NUM:
-//                         printf("%d", args[i].num)
-//                         break
-//                     case WORD_NONE:
-//                         printf("None")
-//                         break
-//                     default:
-//                         printf("[type: %d]", args[i].type)
-//                         break
-//                 }
-//                 if (i < argc - 1) {
-//                     printf(" ")
-//                 }
-//             }
-//             printf("\n")
-//             break
-//         case WORD_INST_LEN:
-//             if (args[0].type == WORD_STR) {
-//                 if (return_value) {
-//                     return_value->type = WORD_NUM
-//                     return_value->num = strlen(args[0].str)
-//                 }
-//             } else {
-//                 printf("Error: LEN expects a string argument\n")
-//                 return EXEC_ERROR
-//             }
-//             break
-//         case WORD_INST_STOP:
-//             return EXEC_END
-//         case WORD_INST_LET:
-//             if (args[0].type != WORD_VAR) {
-//                 printf("Error: LET expects a variable as first argument\n")
-//                 return EXEC_ERROR
-//             }
-//             if (args[1].type == WORD_STR) {
-//                 args[0].var_ptr->type = VAR_STRING
-//                 args[0].var_ptr->value.str = strdup(args[1].str)
-//             } else if (args[1].type == WORD_NUM) {
-//                 args[0].var_ptr->type = VAR_NUMBER
-//                 args[0].var_ptr->value.num = args[1].num
-//             } else {
-//                 printf("Error: LET expects a string or number as second argument\n")
-//                 return EXEC_ERROR
-//             }
-//             break
-//         case WORD_INST_THEN:
-//             // arguments are already executed, nothing to do here
-//             break
-//         case WORD_INST_IF:
-//             if ((args[0].type == WORD_NUM && args[0].num) || (args[0].type == WORD_STR && arg[s[0])) {
-//                 int a = execute_word(word_s[word].value + 1, NULL)
-//                 if (a != EXEC_CONTINUE) {
-//                     return a
-//                 }
-//             }
-//             break
-//         case WORD_INST_GOTO:
-//             if (args[0].type != WORD_NUM) {
-//                 printf("Error: GOTO expects a number argument\n")
-//                 return EXEC_ERROR
-//             }
-//             if (args[0].num < 0 || args[0].num >= 100 || g_goto_table[args[0].num] == 0xFFFF) {
-//                 printf("Error: GOTO label %d does not exist\n", args[0].num)
-//                 return EXEC_ERROR
-//             }
-//             return g_goto_table[args[0].num]
-//         case WORD_INST_LT:
-//             if (args[0].type != WORD_NUM || args[1].type != WORD_NUM) {
-//                 printf("Error: < expects two number arguments\n")
-//                 return EXEC_ERROR
-//             }
-//             if (return_value) {
-//                 return_value->type = WORD_NUM
-//                 return_value->num = args[0].num < args[1].num
-//             }
-//             break
-//         case WORD_INST_PLUS:
-//             if (args[0].type != WORD_NUM || args[1].type != WORD_NUM) {
-//                 printf("Error: + expects two number arguments\n")
-//                 return EXEC_ERROR
-//             }
-//             if (return_value) {
-//                 return_value->type = WORD_NUM
-//                 return_value->num = args[0].num + args[1].num
-//             }
-//             break
-//         default:
-//             printf("Error: unknown instruction type: %d\n", word_s[word].type)
-//             return EXEC_ERROR
-//     }
-//     return EXEC_CONTINUE
-// }
+    if (word_s[word].type == WORD_NONE) {
+        printf("None ")
+    } elif (word_s[word].type == WORD_VAR) {
+        printf("%s ", var_s[word_s[word].value].name)
+    } elif (word_s[word].type == WORD_STR) {
+        printf("\"%s\" ", word_s[word].value)
+    } elif (word_s[word].type == WORD_NUM) {
+        printf("%d ", word_s[word].value)
+    } else {
+        for i (0, INTMAX, sizeof(inst_s)) {
+            if (i / sizeof(inst_s) > INSTRCTIONS_COUNT) {
+                printf("[type: %d] ", word_s[word].type)
+                break
+            }
+            if (inst_s[g_instructions + i].type == word_s[word].type) {
+                printf("%s ", inst_s[g_instructions + i].name)
+                break
+            }
+        }
+    }
+
+    if (word_s[word].type < WORD_FIRST_INST) {
+        return
+    }
+
+    i = 0
+    while (word_s[word_s[word].value + i].type != WORD_NONE) {
+        print_word(word_s[word].value + i)
+        i = i + sizeof(word_s)
+    }
+    printf(") ")
+}
+
+func execute_word([word], [return_value]) {
+    if (return_value) {
+        word_s[return_value].type = WORD_NONE
+    }
+
+    : args = alloca(sizeof(word_s) * (VAARG_FUNC + 1))
+    : argc = 0
+    : a i = 0
+
+    while (word_s[word_s[word].value + i].type != WORD_NONE) {
+        if (argc >= VAARG_FUNC) {
+            printf("Error: too many arguments\n")
+            return EXEC_ERROR
+        }
+        if (word_s[word_s[word].value + i].type == WORD_VAR) {
+            if (word_s[word].type == WORD_INST_LET) {
+                word_s[args + i].type  = word_s[word_s[word].value + i].type
+                word_s[args + i].value = word_s[word_s[word].value + i].value
+            } else {
+                word_s[args + i].type  = var_s[word_s[word_s[word].value + i].value].type
+                word_s[args + i].value = var_s[word_s[word_s[word].value + i].value].value
+            }
+        } elif (word_s[word_s[word].value + i].type < WORD_FIRST_INST) {
+            word_s[args + i].type  = word_s[word_s[word].value + i].type
+            word_s[args + i].value = word_s[word_s[word].value + i].value
+        } elif (word_s[word].type != WORD_INST_IF || argc != 1) {
+            a = execute_word(word_s[word].value + i, args + i)
+            if (a != EXEC_CONTINUE) {
+                return a
+            }
+        }
+        i = i + sizeof(word_s)
+        argc++
+    }
+
+    switch (word_s[word].type) {
+        case WORD_INST_PRINT {
+            for i (0, argc * sizeof(word_s), sizeof(word_s)) {
+                switch (word_s[args + i].type) {
+                    case WORD_STR {
+                        printf("%s", word_s[args + i].value)
+                    }
+                    case WORD_NUM {
+                        printf("%d", word_s[args + i].value)
+                    }
+                    case WORD_NONE {
+                        printf("None")
+                    }
+                    default {
+                        printf("[type: %d]", word_s[args + i].type)
+                    }
+                }
+                if (i / sizeof(word_s) < argc - 1) {
+                    printf(" ")
+                }
+            }
+            printf("\n")
+        }
+
+        case WORD_INST_LEN {
+            if (word_s[args].type == WORD_STR) {
+                if (return_value) {
+                    word_s[return_value].type  = WORD_NUM
+                    word_s[return_value].value = strlen(word_s[args].value)
+                }
+            } else {
+                printf("Error: LEN expects a string argument\n")
+                return EXEC_ERROR
+            }
+        }
+
+        case WORD_INST_STOP {
+            return EXEC_END
+        }
+
+        case WORD_INST_LET {
+            if (word_s[args].type != WORD_VAR) {
+                printf("Error: LET expects a variable as first argument\n")
+                return EXEC_ERROR
+            }
+            switch (word_s[args + sizeof(word_s)].type) {
+                case WORD_STR {
+                    var_s[word_s[args].value].type  = VAR_STRING
+                    var_s[word_s[args].value].value = strdup(word_s[args + sizeof(word_s)].value)
+                }
+                case WORD_NUM {
+                    var_s[word_s[args].value].type  = VAR_NUMBER
+                    var_s[word_s[args].value].value = word_s[args + sizeof(word_s)].value
+                }
+                default {
+                    printf("Error: LET expects a string or number as second argument\n")
+                    return EXEC_ERROR
+                }
+            }
+        }
+
+        case WORD_INST_THEN {
+            // arguments are already executed, nothing to do here
+        }
+
+        case WORD_INST_IF {
+            if ((word_s[args].type == WORD_NUM && word_s[args].value) || (word_s[args].type == WORD_STR && [word_s[args].value])) {
+                a = execute_word(word_s[word].value + sizeof(word_s), NULL)
+                if (a != EXEC_CONTINUE) {
+                    return a
+                }
+            }
+        }
+
+        case WORD_INST_GOTO {
+            if (word_s[args].type != WORD_NUM) {
+                printf("Error: GOTO expects a number argument\n")
+                return EXEC_ERROR
+            }
+            if (word_s[args].value < 0 || word_s[args].value >= 100 || [g_goto_table + word_s[args].value] == 0xFFFF) {
+                printf("Error: GOTO label %d does not exist\n", word_s[args].value)
+                return EXEC_ERROR
+            }
+            return [g_goto_table + word_s[args].value]
+        }
+
+        case WORD_INST_LT {
+            if (word_s[args].type != WORD_NUM || word_s[args + sizeof(word_s)].type != WORD_NUM) {
+                printf("Error: < expects two number arguments\n")
+                return EXEC_ERROR
+            }
+            if (return_value) {
+                word_s[return_value].type = WORD_NUM
+                word_s[return_value].value = word_s[args].value < word_s[args + sizeof(word_s)].value
+            }
+        }
+
+        case WORD_INST_PLUS {
+            if (word_s[args].type != WORD_NUM || word_s[args + sizeof(word_s)].type != WORD_NUM) {
+                printf("Error: + expects two number arguments\n")
+                return EXEC_ERROR
+            }
+            if (return_value) {
+                word_s[return_value].type = WORD_NUM
+                word_s[return_value].value = word_s[args].value + word_s[args + sizeof(word_s)].value
+            }
+        }
+
+        default {
+            printf("Error: unknown instruction type: %d\n", word_s[word].type)
+            return EXEC_ERROR
+        }
+    }
+    return EXEC_CONTINUE
+}
 
 func free_variable_list([var]) {
     while (var) {
@@ -641,7 +661,7 @@ func main() {
     //         "STOP\n"
     //         "[1] PRINT \"You are a minor.\"\n"*/
 
-    : program = "i = 123\n[1] i = + i 1\nPRINT i\nIF (< i 10) GOTO 1\n"
+    : program = "i = 1\n[1] i = + i 1\nPRINT i\nIF (< i 10) GOTO 1\n"
 
     // char *program =
     //        "coucou = \"hi!\"\n"
@@ -682,21 +702,25 @@ func main() {
         printf("\n")
     }
 
-    // printf("Executing program...\n")
+    printf("\nExecuting program...\n")
 
-    // for i (0, line_count) {
-    //     : a = execute_word(lines[i], NULL)
-    //     
-    //     if (a == EXEC_ERROR) {
-    //         return 1
-    //     } else if (a == EXEC_END) {
-    //         break
-    //     } else if (a != EXEC_CONTINUE) {
-    //         i = a
-    //     } else {
-    //         i++
-    //     }
-    // }
+    i = 0
+    while (i < line_count) {
+        : a = execute_word([lines + i], NULL)
+        
+        if (a == EXEC_ERROR) {
+            printf("Error executing instruction: ")
+            print_word([lines + i])
+            printf("\n")
+        } elif (a == EXEC_END) {
+            break
+        } elif (a != EXEC_CONTINUE) {
+            i = a
+        } else {
+            i++
+        }
+    }
+    printf("Program finished.\n")
 
     // free_variable_list(g_var_tail)
 }
