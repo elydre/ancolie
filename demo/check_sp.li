@@ -1,0 +1,68 @@
+:i
+
+dump(_get_sp())
+
+if (1) {
+    dump(1)
+    dump(_get_sp())
+}
+
+if (0) {
+} else {
+    dump(2)
+    dump(_get_sp())
+}
+
+while (1) {
+    dump(3)
+    dump(_get_sp())
+    break
+}
+
+for i (0) {
+    dump(4)
+    dump(_get_sp())
+    break
+}
+
+for i (0, 10) {
+    dump(5)
+    dump(_get_sp())
+    break
+}
+
+for i (0, 10, 2) {
+    dump(6)
+    dump(_get_sp())
+    break
+}
+
+sub {
+    dump(7)
+    dump(_get_sp())
+}
+
+switch (1) {
+    case 1 {
+        dump(8)
+        dump(_get_sp())
+    }
+}
+
+switch (0) {
+    case 1 {
+    }
+    default {
+        dump(9)
+        dump(_get_sp())
+    }
+}
+
+switch (12) {
+    case 1 {
+    }
+    default {
+        dump(9)
+        dump(_get_sp())
+    }
+}
