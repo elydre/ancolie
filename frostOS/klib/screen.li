@@ -1,3 +1,7 @@
+$ screen_x
+$ screen_y
+$ screen_color = 0x0F00
+
 func screen_flush() {
     out(0x1021, screen_y * 80 + screen_x)
     out(0x1020, 0)
@@ -74,7 +78,7 @@ func printn(str, len) {
     }
 }
 
-#define print(str) printn(str, INTMAX)
+#define print(str) printn(str, 0xFFFF)
 
 func screen_mk_color(str) {
     : i c color

@@ -7,14 +7,17 @@
 
 #define WORD_INST_INPUT 4
 #define WORD_INST_PRINT 5
-#define WORD_INST_GOTO  6
-#define WORD_INST_IF    7
-#define WORD_INST_STOP  8
-#define WORD_INST_LET   9
-#define WORD_INST_LEN   10
-#define WORD_INST_THEN  11
-#define WORD_INST_LT    12
-#define WORD_INST_PLUS  13
+#define WORD_INST_WRITE 6
+#define WORD_INST_GOTO  7
+#define WORD_INST_IF    8
+#define WORD_INST_STOP  9
+#define WORD_INST_LET   10
+#define WORD_INST_LEN   11
+#define WORD_INST_THEN  12
+#define WORD_INST_LT    13
+#define WORD_INST_PLUS  14
+#define WORD_INST_EQ    15
+#define WORD_INST_MOD   16
 
 #define VAARG_FUNC 10
 
@@ -22,16 +25,13 @@
 #define EXEC_ERROR    0xFFFE
 #define EXEC_CONTINUE 0xFFFD
 
-#define VAR_STRING WORD_VAR
-#define VAR_NUMBER WORD_NUM
+#define VAR_STR WORD_STR
+#define VAR_NUM WORD_NUM
 
 // standard library
-$ screen_x
-$ screen_y
-$ screen_color = 0x0F00
-
 #include "malloc.li"
 #include "klib/screen.li"
+#include "klib/input.li"
 
 func issamestr([str1], str1len, [str2]) { // str2 is null-terminated
     : i
@@ -93,7 +93,6 @@ func atoi([str]) {
 
 // end
 
-
 struct var_s {
     : [name]
     : type
@@ -112,15 +111,21 @@ struct inst_s {
     : argc
 }
 
+#define GOTO_TABLE   0x0100
+#define VAR_TABLE    0x0200
+#define MALLOC_DEBUT 0x2200
+#define MALLOC_SIZE  0x1000
+#define HEAP_DEBUT   0x3200
+
 $ [g_var_tail] = NULL // var_s
-$ [g_goto_table] = 0x10
 $ [[g_instructions]]
 
-#define INSTRCTIONS_COUNT 10
+#define INSTRCTIONS_COUNT 13
 
 g_instructions = array(
     WORD_INST_INPUT, "INPUT", 1,
     WORD_INST_PRINT, "PRINT", VAARG_FUNC,
+    WORD_INST_WRITE, "WRITE", VAARG_FUNC,
     WORD_INST_GOTO,  "GOTO",  1,
     WORD_INST_IF,    "IF",    2,
     WORD_INST_STOP,  "STOP",  0,
@@ -128,16 +133,32 @@ g_instructions = array(
     WORD_INST_LEN,   "LEN",   1,
     WORD_INST_THEN,  "THEN",  VAARG_FUNC,
     WORD_INST_LT,    "<",     2,
-    WORD_INST_PLUS,  "+",     2
+    WORD_INST_PLUS,  "+",     2,
+    WORD_INST_EQ,    "==",    2,
+    WORD_INST_MOD,   "%",     2
 )
 
-#define HEAP_DEBUT 0x2010
 
 func new_word(count) {
     $ addr = HEAP_DEBUT
     : old = addr
 
     addr = addr + sizeof(word_s) * count
+
+    return old
+}
+
+func new_var(name_len) {
+    $ addr = VAR_TABLE
+    : old = addr
+
+    addr = addr + sizeof(var_s) + name_len + 1
+
+    if (addr > MALLOC_DEBUT) {
+        printf("Error: out of memory\n")
+        addr = old
+        return NULL
+    }
     return old
 }
 
@@ -229,10 +250,16 @@ func get_variable_or_create([str], length) {
     }
 
     // variable not found, create a new one
-    var = malloc(sizeof(var_s))
+    var = new_var(length)
+    var_s[var].name = var + sizeof(var_s)
 
-    var_s[var].name = strndup(str, length)
-    var_s[var].type = VAR_NUMBER
+    : i
+    for i (0, length) {
+        [var_s[var].name + i] = [str + i]
+    }
+    [var_s[var].name + length] = '\0'
+
+    var_s[var].type = VAR_NUM
     var_s[var].value = 0
     var_s[var].prev = g_var_tail
     g_var_tail = var
@@ -262,7 +289,7 @@ func check_goto_label([str], [length], pos) {
         return 0
     }
 
-    [g_goto_table + label_num] = pos // mark label as used
+    [GOTO_TABLE + label_num] = pos // mark label as used
     [length] = [length] - (i + 1)
 
     return i + 1 // return the number of characters to skip
@@ -292,7 +319,7 @@ func parse_str([str], length, [word]) { // word_s[word]
         length--
     }
 
-    printf("parsing: %S\n", str, length)
+    // printf("parsing: %S\n", str, length)
 
     : end = tok_end(str, length)
 
@@ -524,7 +551,7 @@ func execute_word([word], [return_value]) {
     }
 
     switch (word_s[word].type) {
-        case WORD_INST_PRINT {
+        case WORD_INST_PRINT, WORD_INST_WRITE {
             for i (0, argc * sizeof(word_s), sizeof(word_s)) {
                 switch (word_s[args + i].type) {
                     case WORD_STR {
@@ -544,7 +571,9 @@ func execute_word([word], [return_value]) {
                     printf(" ")
                 }
             }
-            printf("\n")
+            if (word_s[word].type == WORD_INST_PRINT) {
+                printf("\n")
+            }
         }
 
         case WORD_INST_LEN {
@@ -570,11 +599,11 @@ func execute_word([word], [return_value]) {
             }
             switch (word_s[args + sizeof(word_s)].type) {
                 case WORD_STR {
-                    var_s[word_s[args].value].type  = VAR_STRING
+                    var_s[word_s[args].value].type  = VAR_STR
                     var_s[word_s[args].value].value = strdup(word_s[args + sizeof(word_s)].value)
                 }
                 case WORD_NUM {
-                    var_s[word_s[args].value].type  = VAR_NUMBER
+                    var_s[word_s[args].value].type  = VAR_NUM
                     var_s[word_s[args].value].value = word_s[args + sizeof(word_s)].value
                 }
                 default {
@@ -602,11 +631,11 @@ func execute_word([word], [return_value]) {
                 printf("Error: GOTO expects a number argument\n")
                 return EXEC_ERROR
             }
-            if (word_s[args].value < 0 || word_s[args].value >= 100 || [g_goto_table + word_s[args].value] == 0xFFFF) {
+            if (word_s[args].value < 0 || word_s[args].value >= 100 || [GOTO_TABLE + word_s[args].value] == 0xFFFF) {
                 printf("Error: GOTO label %d does not exist\n", word_s[args].value)
                 return EXEC_ERROR
             }
-            return [g_goto_table + word_s[args].value]
+            return [GOTO_TABLE + word_s[args].value]
         }
 
         case WORD_INST_LT {
@@ -631,6 +660,28 @@ func execute_word([word], [return_value]) {
             }
         }
 
+        case WORD_INST_EQ {
+            if (word_s[args].type != WORD_NUM || word_s[args + sizeof(word_s)].type != WORD_NUM) {
+                printf("Error: + expects two number arguments\n")
+                return EXEC_ERROR
+            }
+            if (return_value) {
+                word_s[return_value].type = WORD_NUM
+                word_s[return_value].value = word_s[args].value == word_s[args + sizeof(word_s)].value
+            }
+        }
+
+        case WORD_INST_MOD {
+            if (word_s[args].type != WORD_NUM || word_s[args + sizeof(word_s)].type != WORD_NUM) {
+                printf("Error: %% expects two number arguments\n")
+                return EXEC_ERROR
+            }
+            if (return_value) {
+                word_s[return_value].type = WORD_NUM
+                word_s[return_value].value = word_s[args].value % word_s[args + sizeof(word_s)].value
+            }
+        }
+
         default {
             printf("Error: unknown instruction type: %d\n", word_s[word].type)
             return EXEC_ERROR
@@ -642,7 +693,7 @@ func execute_word([word], [return_value]) {
 func free_variable_list([var]) {
     while (var) {
         : prev = var_s[var].prev
-        if (var_s[var].type == VAR_STRING) {
+        if (var_s[var].type == VAR_STR) {
             free(var_s[var].value)
         }
         free(var_s[var].name)
@@ -654,64 +705,50 @@ func free_variable_list([var]) {
 func main() {
     :i
 
-    // char *program =
-    //         "age = 100\n"
-    //         "IF (< age 18) GOTO 1\n"
-    //         "PRINT \"You are an adult.\"\n"
-    //         "STOP\n"
-    //         "[1] PRINT \"You are a minor.\"\n"*/
+    // : program = "i = 0\n[1] i = + i 1\nPRINT i\nIF (< i 10) GOTO 1\n"
+    memset(GOTO_TABLE, 0xFFFF, 100)
 
-    : program = "i = 1\n[1] i = + i 1\nPRINT i\nIF (< i 10) GOTO 1\n"
-
-    // char *program =
-    //        "coucou = \"hi!\"\n"
-    //        "PRINT \"Hello\" (LEN \"oui\") coucou\n"
-    //        "PRINT 1 LEN \"hi\"\n"
-    //        "IF 1 THEN (PRINT \"if is true\") (PRINT 123)\n"*/
-
-    // split program into lines
-    : [lines] = alloca(sizeof(word_s) * 10)
+    : [strline] = alloca(64)
+    : [lines] = alloca(sizeof(word_s) * 32)
     : line_count = 0
 
-    // printf("dd%d\n", [program])
+    while (1) {
+        print("# ")
+        screen_flush()
 
-    while ([program]) {
-        : end = line_end(program, strlen(program))
+        : end = input(strline, 64)
 
         if (end == 0) {
             break
         }
 
-        printf("Line: %S\n", program, end)
-
-        program = program + check_goto_label(program, &end, line_count)
-        [lines + line_count] = parse_str(program, end, NULL)
-
-        if ([lines + line_count] == NULL) {
-            printf("Error parsing instruction: %S\n", program, end)
-            return 1
+        strline = strline + check_goto_label(strline, &end, line_count)
+        if (end == 0) {
+            continue
         }
 
-        line_count++
-        program = program + end + 1
+        [lines + line_count] = parse_str(strline, end, NULL)
+
+        if ([lines + line_count]) {
+            line_count++
+        }
     }
 
-    printf("\n") 
-    for i (0, line_count) {
-        print_word([lines + i])
-        printf("\n")
-    }
-
-    printf("\nExecuting program...\n")
+    // for i (0, line_count) {
+    //     print_word([lines + i])
+    //     printf("\n")
+    // }
+    // printf("\n")
 
     i = 0
     while (i < line_count) {
         : a = execute_word([lines + i], NULL)
-        
+
         if (a == EXEC_ERROR) {
-            printf("Error executing instruction: ")
+            printf("%d: ", i + 1)
             print_word([lines + i])
             printf("\n")
+            break
         } elif (a == EXEC_END) {
             break
         } elif (a != EXEC_CONTINUE) {
@@ -720,14 +757,11 @@ func main() {
             i++
         }
     }
-    printf("Program finished.\n")
-
     // free_variable_list(g_var_tail)
 }
 
-malloc_init(0x10, 0x2000, 16)
-main()
+malloc_init(MALLOC_DEBUT, MALLOC_SIZE, 16)
 
 while (1) {
-    out(0x1031, 1)
+    main()
 }

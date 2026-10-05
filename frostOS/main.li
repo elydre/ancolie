@@ -1,4 +1,6 @@
-#include "klib/klib.li"
+#include "klib/screen.li"
+#include "klib/string.li"
+#include "klib/input.li"
 
 print("is this working?\n\n")
 
@@ -105,6 +107,7 @@ func shell() {
 
     while 1 {
         print("> ")
+        screen_flush()
         if input(buffer, 20) {
             interpret(buffer)    
         }

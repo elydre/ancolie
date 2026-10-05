@@ -1,7 +1,0 @@
-$ screen_x
-$ screen_y
-$ screen_color = 0x0F00
-
-#include "screen.li"
-#include "string.li"
-#include "input.li"

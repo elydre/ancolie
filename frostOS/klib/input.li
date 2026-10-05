@@ -37,7 +37,7 @@ func input(buffer, size) {
             continue
         }
 
-        if buffer_i < size - 1 {
+        if buffer_i < size - 1 && !(chr &b 0x80) {
             [buffer + buffer_i] = chr
             putchar(chr)
             screen_flush()

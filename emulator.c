@@ -284,6 +284,8 @@ void init_gui(void) {
         cleanup_gui();
         exit(1);
     }
+
+    SDL_StartTextInput();
 }
 
 void update_gui(void) {
@@ -298,6 +300,31 @@ void update_gui(void) {
 
 #define SMOOTHING_FACTOR 5
 
+static uint16_t decode_utf8_character(const char **text) {
+    const uint8_t *bytes = (const uint8_t *) *text;
+    uint32_t codepoint;
+
+    if (bytes[0] < 0x80) {
+        *text += 1;
+        return bytes[0];
+    }
+    if ((bytes[0] & 0xE0) == 0xC0) {
+        codepoint = ((uint32_t)(bytes[0] & 0x1F) << 6) | (bytes[1] & 0x3F);
+        *text += 2;
+        return (uint16_t) codepoint;
+    }
+    if ((bytes[0] & 0xF0) == 0xE0) {
+        codepoint = ((uint32_t)(bytes[0] & 0x0F) << 12) |
+                    ((uint32_t)(bytes[1] & 0x3F) << 6) |
+                    (bytes[2] & 0x3F);
+        *text += 3;
+        return (uint16_t) codepoint;
+    }
+
+    *text += 4;
+    return 0xFFFD;
+}
+
 void gui_loop(uint64_t ips, uint64_t delta_time) {
     SDL_Event event;
 
@@ -306,11 +333,31 @@ void gui_loop(uint64_t ips, uint64_t delta_time) {
             cleanup_gui();
             exit(0);
         } else if (event.type == SDL_KEYDOWN || event.type == SDL_KEYUP) {
+            int is_modifier = event.key.keysym.scancode == SDL_SCANCODE_LSHIFT ||
+                              event.key.keysym.scancode == SDL_SCANCODE_RSHIFT ||
+                              event.key.keysym.scancode == SDL_SCANCODE_LCTRL ||
+                              event.key.keysym.scancode == SDL_SCANCODE_RCTRL ||
+                              event.key.keysym.scancode == SDL_SCANCODE_LALT ||
+                              event.key.keysym.scancode == SDL_SCANCODE_RALT;
+            int is_control = event.key.keysym.sym < 32 ||
+                             event.key.keysym.sym == 127 ||
+                             event.key.keysym.sym >= SDLK_SCANCODE_MASK;
+
+            if (is_modifier || (event.type == SDL_KEYDOWN && !is_control))
+                continue;
+
             keyboard_event_t kevent;
             kevent.type = (event.type == SDL_KEYDOWN) ? 1 : 2;
             kevent.value = event.key.keysym.sym;
 
             if (gui.kbbuf_size < (int)(sizeof(gui.kbbuf) / sizeof(keyboard_event_t))) {
+                gui.kbbuf[gui.kbbuf_size++] = kevent;
+            }
+        } else if (event.type == SDL_TEXTINPUT) {
+            const char *text = event.text.text;
+
+            while (*text != '\0' && gui.kbbuf_size < (int)(sizeof(gui.kbbuf) / sizeof(keyboard_event_t))) {
+                keyboard_event_t kevent = { .type = 1, .value = decode_utf8_character(&text) };
                 gui.kbbuf[gui.kbbuf_size++] = kevent;
             }
         }
@@ -674,11 +721,9 @@ void execute_program() {
                 pc++;
                 break;
             case 0x1B: // load
-            {
-                WVAL(xmem[pc], source0, rwmem[RVAL(source0, xmem[pc]) + RVAL(source1, xmem[pc + 1])]);
+                WVAL(xmem[pc], source0, rwmem[(uint16_t)(RVAL(source0, xmem[pc]) + RVAL(source1, xmem[pc + 1]))]);
                 pc += 2;
                 break;
-            }
             case 0x1C: // pops
                 rwmem[(uint16_t)(RVAL(source0, xmem[pc]) + RVAL(source1, xmem[pc + 1]))] = rwmem[rwmem[sp]];
                 rwmem[sp]++;
