@@ -47,10 +47,10 @@ def validate_infix(tokens: list):
         token = tokens[i]
 
         if token in defs.CHARS_OPR + ["."]:
-            if previous in (OP, OPEN_PAR) and token not in ("&", "!"):
+            if previous in (OP, OPEN_PAR) and token not in ("&", "!", "~"):
                 utl.say_error(f"Missing value before operator '{token}'")
 
-            if token in ("&", "!") and previous not in (OP, OPEN_PAR):
+            if token in ("&", "!", "~") and previous not in (OP, OPEN_PAR):
                 utl.say_error(f"Missing operator before '{token}'")
 
             if i == len(tokens) - 1 and token not in ("++", "--"):
@@ -316,6 +316,9 @@ def calculate_expr(rpn: list, is_infix: bool = True):
             elif token == '!':
                 output.add("eq", b, (1, 0))
                 stack_size += 1 # noting consumed
+            elif token == '~':
+                output.add("bnot", b)
+                stack_size += 1 # noting consumed
             elif token == '<<':
                 output.add("bshl", a, b)
             elif token == '>>':
@@ -323,7 +326,7 @@ def calculate_expr(rpn: list, is_infix: bool = True):
             else:
                 utl.say_error(f"Unknown operator in expression: {token}", internal=True)
 
-            if last_number is None and token != '!':
+            if last_number is None and token not in ("!", "~"):
                 output.add("pop",
                     (1, 0))
             else:

@@ -110,7 +110,7 @@ class opti_pattern:
 
         return output.instructions
 
-ops = "sub|add|mul|div|mod|eq|neq|lt|gt|lte|gte|and|band|bor"
+ops = "sub|add|mul|div|mod|eq|neq|lt|gt|lte|gte|and|band|bor|bshl|bshr"
 
 patterns = [
     opti_pattern(
