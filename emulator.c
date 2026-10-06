@@ -335,9 +335,9 @@ void gui_loop(uint64_t ips, uint64_t delta_time) {
         } else if (event.type == SDL_KEYDOWN || event.type == SDL_KEYUP) {
             int is_modifier = event.key.keysym.scancode == SDL_SCANCODE_LSHIFT ||
                               event.key.keysym.scancode == SDL_SCANCODE_RSHIFT ||
-                              event.key.keysym.scancode == SDL_SCANCODE_LCTRL ||
-                              event.key.keysym.scancode == SDL_SCANCODE_RCTRL ||
-                              event.key.keysym.scancode == SDL_SCANCODE_LALT ||
+                              event.key.keysym.scancode == SDL_SCANCODE_LCTRL  ||
+                              event.key.keysym.scancode == SDL_SCANCODE_RCTRL  ||
+                              event.key.keysym.scancode == SDL_SCANCODE_LALT   ||
                               event.key.keysym.scancode == SDL_SCANCODE_RALT;
             int is_control = event.key.keysym.sym < 32 ||
                              event.key.keysym.sym == 127 ||
@@ -347,7 +347,7 @@ void gui_loop(uint64_t ips, uint64_t delta_time) {
                 continue;
 
             keyboard_event_t kevent;
-            kevent.type = (event.type == SDL_KEYDOWN) ? 1 : 2;
+            kevent.type = (event.type == SDL_KEYDOWN) ? 3 : 4;
             kevent.value = event.key.keysym.sym;
 
             if (gui.kbbuf_size < (int)(sizeof(gui.kbbuf) / sizeof(keyboard_event_t))) {
