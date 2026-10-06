@@ -25,6 +25,7 @@
 #define WORD_INST_RUN   18
 #define WORD_INST_NEW   19
 #define WORD_INST_HELP  20
+#define WORD_INST_SSTAT 21
 
 #define VAARG_FUNC 10
 
@@ -38,7 +39,8 @@
 
 // memory layout
 #define GOTO_TABLE    0x0100
-#define VAR_TABLE     0x0200
+#define VARTAB_DEBUT  0x0200
+#define VARTAB_SIZE   0x1000
 #define STRPROG_DEBUT 0x1200
 #define STRPROG_SIZE  0x2000
 #define MALLOC_DEBUT  0x3200
@@ -81,7 +83,7 @@ vafunc say_error(argc, [argp]) {
 $ [g_var_tail] = NULL // var_s
 $ [[g_instructions]]
 
-#define INSTRCTIONS_COUNT 17
+#define INSTRCTIONS_COUNT 18
 
 g_instructions = array(
     WORD_INST_INPUT, "INPUT", 1,
@@ -100,7 +102,8 @@ g_instructions = array(
     WORD_INST_ED,    "ED",    0,
     WORD_INST_RUN,   "RUN",   0,
     WORD_INST_NEW,   "NEW",   0,
-    WORD_INST_HELP,  "HELP",  0
+    WORD_INST_HELP,  "HELP",  0,
+    WORD_INST_SSTAT, "SSTAT", 0
 )
 
 func new_word(count) {
@@ -118,19 +121,19 @@ func new_word(count) {
     return old
 }
 
-func new_var(name_len) {
-    $ addr = VAR_TABLE
+func new_var(size) {
+    $ addr = VARTAB_DEBUT
 
-    if (name_len == INTMAX) {
-        addr = VAR_TABLE
+    if (size == INTMAX) {
+        addr = VARTAB_DEBUT
         return NULL
     }
 
     : old = addr
 
-    addr = addr + sizeof(var_s) + name_len + 1
+    addr = addr + size
 
-    if (addr > MALLOC_DEBUT) {
+    if (addr > VARTAB_DEBUT + VARTAB_SIZE) {
         say_error("out of memory\n")
         addr = old
         return NULL
@@ -221,7 +224,7 @@ func get_variable_or_create([str], length) {
     }
 
     // variable not found, create a new one
-    var = new_var(length)
+    var = new_var(sizeof(var_s) + length + 1)
     var_s[var].name = var + sizeof(var_s)
 
     : i
@@ -712,6 +715,26 @@ func execute_word([word], [return_value]) {
             screen_color = 0x0F00
         }
 
+        case WORD_INST_SSTAT {
+            : varcount = 0
+            var = g_var_tail
+            while (var) {
+                varcount++
+                var = var_s[var].prev
+            }
+
+            : heap_addr = new_word(0)
+            : proglen = strlen(STRPROG_DEBUT)
+
+            printf("$02SYSTEM STATUS -$07\n")
+            printf("  $07Variable table  $0F%d%%$07 (%d defined)\n", (new_var(0) - VARTAB_DEBUT) / (0x1000 / 100), varcount)
+            printf("  $07Heap usage      $0F%d%%$07 (%d words used)\n", (heap_addr - HEAP_DEBUT) / ([_lSP] / 100), heap_addr - HEAP_DEBUT)
+            printf("  $07Program memory  $0F%d%%$07 (%d words used)\n", proglen / (0x2000 / 100), proglen)
+            printf("  $07Allocations     $0F%d\n", malloc_data.malloc_count)
+            printf("  $07Current heap    $0F%x\n", heap_addr)
+            printf("  $07Stack pointer   $0F%x\n", [_lSP])
+        }
+
         default {
             say_error("instruction '%s' (%d) is not implemented\n", get_instruction_name(word_s[word].type), word_s[word].type)
             return EXEC_ERROR
@@ -752,7 +775,7 @@ func program_run() {
             program = program + 1
             continue
         }
-    
+
         [lines + line_count] = parse_str(program, end, NULL)
 
         if ([lines + line_count] == NULL) {
@@ -763,7 +786,7 @@ func program_run() {
         program = program + end + 1
     }
 
-    // printf("\n") 
+    // printf("\n")
     // for i (0, line_count) {
     //     print_word([lines + i])
     //     printf("\n")
@@ -772,7 +795,7 @@ func program_run() {
     i = 0
     while (i < line_count) {
         : a = execute_word([lines + i], NULL)
-        
+
         if (a == EXEC_ERROR) {
             printf("on ", i + 1)
             print_word([lines + i])
@@ -818,6 +841,7 @@ func main() {
 
         strline = strline + check_goto_label(strline, &end, line_count)
         if (end == 0) {
+            print("> ")
             continue
         }
 

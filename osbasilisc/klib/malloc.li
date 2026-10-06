@@ -1,19 +1,15 @@
-struct madata {
+struct mdata_s {
     : debut
     : size
     : block_size
     : index_size
+    : malloc_count
 }
 
 $ g_malloc_data
-$ g_bitshift
-$ g_nbitshift
-g_malloc_data = alloca(sizeof(madata))
+g_malloc_data = alloca(sizeof(mdata_s))
 
-g_bitshift = array(1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768)
-g_nbitshift = array(65534, 65533, 65531, 65527, 65519, 65503, 65471, 65407, 65279, 65023, 64511, 63487, 61439, 57343, 49151, 32767)
-
-#define malloc_data madata[g_malloc_data]
+#define malloc_data mdata_s[g_malloc_data]
 #define MALLOC_MAGIC 0xDEAD
 
 #define calc_index_size(size, block_size) (((size) - 1) / (16 * (block_size)) + 1)
@@ -50,7 +46,7 @@ func malloc(size) {
         }
 
         for i (0, 16) {
-            if ([addr] &b [g_bitshift + i] == 0) {
+            if ([addr] &b (1 << i) == 0) {
                 if (free_count == 0) {
                     debut_addr = addr
                     debut_index = i
@@ -67,7 +63,7 @@ func malloc(size) {
             : d = debut_index
             for j (debut_addr, addr + 1) {
                 for k (d, 16) {
-                    [j] = [j] |b [g_bitshift + k]
+                    [j] = [j] |b (1 << k)
                     if (j == addr && k == i) {
                         break
                     }
@@ -77,6 +73,8 @@ func malloc(size) {
             addr = malloc_data.debut + malloc_data.index_size + debut_addr * malloc_data.block_size * 16 + debut_index * malloc_data.block_size
             [addr++] = MALLOC_MAGIC
             [addr++] = size
+            malloc_data.malloc_count = malloc_data.malloc_count + 1
+            dump(addr)
             return addr
         }
     }
@@ -94,7 +92,7 @@ func free(addr) {
 
     addr = addr - 2
     if ([addr] != MALLOC_MAGIC) {
-        dump(1234)
+        dump(5678)
         return
     }
 
@@ -107,12 +105,15 @@ func free(addr) {
 
     for i (debut_addr, malloc_data.index_size) {
         for j (debut_index, 16) {
-            [i] = [i] &b [g_nbitshift + j]
+            [i] = [i] &b ~(1 << j)
             size = size - malloc_data.block_size
             if (size <= 0) {
+                malloc_data.malloc_count = malloc_data.malloc_count - 1
                 return
             }
         }
         debut_index = 0
     }
+
+    dump(9012)
 }
