@@ -1,6 +1,12 @@
-# cream & ancolie
+# ancolie & basilisc
 
-custom instruction set, esoteric programming language (`ancolie`), single pass compiler (`llc`), emulator and operating system (`frostOS`).
+This repository contains:
+
+- **cream**: a 16-bit instruction set, initially designed for a Minecraft mod.
+- **ancolie**: a typeless 16-bit C-like programming language.
+- **llc**: a compiler that translates Ancolie programs into Cream instructions.
+- **basilisc**: an operating system and programming language written in Ancolie. It's inspired by 1980s computers such as the Commodore 64.
+- **`emulator.c`**: an emulator for the Cream instruction set, which can run Ancolie programs.
 
 ## how to use ?
 
@@ -19,7 +25,7 @@ gcc -DGUI -o emulator emulator.c -lSDL2
 
 ## Todo
 
-### Compiler
+### ancolie
 
 - [x] variable on stack
 - [x] RPN calculator
@@ -53,7 +59,7 @@ gcc -DGUI -o emulator emulator.c -lSDL2
 - [x] basic command line interface for compiler
 - [x] add screen to the emulator
 - [x] langage documentation
-- [ ] create a basic operating system *- in progress*
+- [x] create a basic operating system
 
 ## ancolie language
 
