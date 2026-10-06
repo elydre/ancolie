@@ -36,7 +36,7 @@ func shell_echo(argc, argv) {
 
 func shell_sp(argc, argv) {
     : sp
-    sp = _get_sp()
+    sp = [_lSP]
     printf("Stack pointer: %x\n", sp)
 }
 

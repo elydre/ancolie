@@ -9,6 +9,45 @@ func streq(s1, s2) {
     return 0
 }
 
+func strneqcase([str1], str1len, [str2]) { // str2 is null-terminated
+    : i
+
+    for i (0, str1len) {
+        : c1 = [str1 + i]
+        : c2 = [str2 + i]
+        if (c1 >= 'A' && c1 <= 'Z') {
+            c1 = c1 + 32
+        }
+        if (c2 >= 'A' && c2 <= 'Z') {
+            c2 = c2 + 32
+        }
+        if (c1 != c2) {
+            return 0
+        }
+        if (c2 == 0) {
+            return 0
+        }
+    }
+
+    if ([str2 + str1len] != 0) {
+        return 0
+    }
+
+    return 1
+}
+
+func atoi([str]) {
+    : result = 0
+    : i = 0
+
+    while ([str + i] >= '0' && [str + i] <= '9') {
+        result = result * 10 + ([str + i] - '0')
+        i++
+    }
+
+    return result
+}
+
 func strlen(str) {
     : len
 

@@ -1,0 +1,15 @@
+func strndup([str], length) {
+    : [new_str] = malloc(length + 1)
+    : i
+
+    for i (0, length) {
+        [new_str + i] = [str + i]
+    }
+    [new_str + length] = '\0'
+
+    return new_str
+}
+
+func strdup([str]) {
+    return strndup(str, strlen(str))
+}

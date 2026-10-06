@@ -1,6 +1,15 @@
+func screen_flush_cursor(y, x) {
+    out(0x1021, y * 80 + x)
+    out(0x1020, 0)
+}
+
 func input(buffer, size) {
-    :buffer_i type chr
+    :buffer_i i type chr cursor
     buffer_i = 0
+    cursor = 0
+
+    : debut_x = screen_x
+    : debut_y = screen_y
 
     while 1 {
         type = in(0x1010)
@@ -9,7 +18,7 @@ func input(buffer, size) {
             out(0x1031, 1)
             continue
         }
-        if type == 2 {
+        if type == 2 || type == 4 {
             // keyboard release
             in(0x1011) // consume the keycode
             continue
@@ -17,12 +26,58 @@ func input(buffer, size) {
 
         chr = in(0x1011)
 
-        if chr == '\b' {
-            if buffer_i > 0 {
-                buffer_i--
-                putchar('\b')
-                screen_flush()
+        if (type == 1) {
+            // text key down
+            if buffer_i < size - 1 && (chr >= 32 && chr <= 126) {
+                if (cursor == buffer_i) {
+                    [buffer + buffer_i] = chr
+                    putchar(chr)
+                } else {
+                    // insert character in the middle of the buffer
+                    for i (cursor, buffer_i) {
+                        [buffer + i + 1] = [buffer + i]
+                    }
+                    [buffer + cursor] = chr
+                    screen_x = debut_x
+                    screen_y = debut_y
+                    for i (0, buffer_i + 1) {
+                        putchar([buffer + i])
+                    }
+                }
+                buffer_i++
+                cursor++
+                screen_flush_cursor(debut_y, debut_x + cursor)
             }
+            continue
+        }
+
+        if (type != 3) {
+            // not a special key down
+            continue
+        }
+
+        if chr == '\b' || chr == 127 { // backspace or delete
+            if chr == '\b' && cursor > 0 {
+                for i (cursor, buffer_i) {
+                    [buffer + i - 1] = [buffer + i]
+                }
+                cursor--
+            } elif chr == 127 && cursor < buffer_i {
+                for i (cursor, buffer_i) {
+                    [buffer + i] = [buffer + i + 1]
+                }
+            } else {
+                continue
+            }
+
+            buffer_i--
+            screen_x = debut_x
+            screen_y = debut_y
+            for i (0, buffer_i) {
+                putchar([buffer + i])
+            }
+            [_lSCREEN + (80 * screen_y + screen_x)] = ' '
+            screen_flush_cursor(debut_y, debut_x + cursor)
             continue
         }
 
@@ -33,15 +88,20 @@ func input(buffer, size) {
             return buffer_i
         }
 
-        if chr &b 0xff00 {
+        if chr == 'P' { // left arrow
+            if cursor > 0 {
+                cursor--
+                screen_flush_cursor(debut_y, debut_x + cursor)
+            }
             continue
         }
 
-        if buffer_i < size - 1 && !(chr &b 0x80) {
-            [buffer + buffer_i] = chr
-            putchar(chr)
-            screen_flush()
-            buffer_i++
+        if chr == 'O' { // right arrow
+            if cursor < buffer_i {
+                cursor++
+                screen_flush_cursor(debut_y, debut_x + cursor)
+            }
+            continue
         }
     }
 }

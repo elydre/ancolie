@@ -1,0 +1,151 @@
+
+func editor_line_start([program], cursor) {
+    while cursor > 0 && [program + cursor - 1] != '\n' {
+        cursor--
+    }
+    return cursor
+}
+
+func editor_line_end([program], length, cursor) {
+    while cursor < length && [program + cursor] != '\n' {
+        cursor++
+    }
+    return cursor
+}
+
+$ cursor_x cursor_y
+
+func editor_redraw([program], length, cursor) {
+    : i = 0
+
+    screen_clear()
+
+    screen_color = 0x0700
+    putnbr(1)
+    screen_color = 0x0F00
+    screen_x = 4
+
+    while i < cursor {
+        putchar([program + i])
+        if ([program + i] == '\n') {
+            screen_color = 0x0700
+            putnbr(screen_y + 1)
+            screen_color = 0x0F00
+            screen_x = 4
+        }
+        i++
+    }
+
+    cursor_x = screen_x
+    cursor_y = screen_y
+
+    while i < length {
+        putchar([program + i])
+        if ([program + i] == '\n') {
+            screen_color = 0x0700
+            putnbr(screen_y + 1)
+            screen_color = 0x0F00
+            screen_x = 4
+        }
+        i++
+    }
+
+    out(0x1021, cursor_y * 80 + cursor_x)
+    out(0x1020, 0)
+}
+
+func program_edit() {
+    : program = STRPROG_DEBUT
+    : length = strlen(program)
+    : cursor = 0
+    : type key
+    : line_start line_end column target
+
+    [program] = 0
+    editor_redraw(program, length, cursor)
+
+    while 1 {
+        type = in(0x1010)
+        if type == 0 {
+            out(0x1031, 1)
+            continue
+        }
+        if type == 2 || type == 4 {
+            in(0x1011)
+            continue
+        }
+
+        key = in(0x1011)
+        
+        if (type == 1) {
+            if (key >= 32 && key <= 126 && length < STRPROG_SIZE - 1) {
+                memmov(program + cursor + 1, program + cursor, length - cursor)
+                [program + cursor] = key
+                cursor++
+                length++
+                [program + length] = 0
+            }
+        } elif key == 27 {
+            [program + length] = 0
+            screen_clear()
+            return length
+        } elif key == 'P' {
+            if cursor > 0 {
+                cursor--
+            }
+        } elif key == 'O' {
+            if cursor < length {
+                cursor++
+            }
+        } elif key == 'R' {
+            line_start = editor_line_start(program, cursor)
+            column = cursor - line_start
+            if line_start > 0 {
+                line_end = line_start - 1
+                target = editor_line_start(program, line_end)
+                line_end = editor_line_end(program, length, target)
+                if target + column > line_end {
+                    cursor = line_end
+                } else {
+                    cursor = target + column
+                }
+            }
+        } elif key == 'Q' {
+            line_start = editor_line_start(program, cursor)
+            column = cursor - line_start
+            line_end = editor_line_end(program, length, cursor)
+            if line_end < length {
+                target = line_end + 1
+                line_end = editor_line_end(program, length, target)
+                if target + column > line_end {
+                    cursor = line_end
+                } else {
+                    cursor = target + column
+                }
+            }
+        } elif key == '\b' {
+            if cursor > 0 {
+                memmov(program + cursor - 1, program + cursor, length - cursor)
+                cursor--
+                length--
+                [program + length] = 0
+            }
+        } elif key == 127 {
+            if cursor < length {
+                memmov(program + cursor, program + cursor + 1, length - cursor - 1)
+                length--
+                [program + length] = 0
+            }
+        } elif key == '\r' {
+            if length < STRPROG_SIZE - 1 {
+                memmov(program + cursor + 1, program + cursor, length - cursor)
+                [program + cursor] = '\n'
+                cursor++
+                length++
+                [program + length] = 0
+            }
+        }
+
+        editor_redraw(program, length, cursor)
+    }
+}
