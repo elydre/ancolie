@@ -187,11 +187,10 @@ switch var {
 }
 ```
 
-### Built-in functions
+### Built-in functions and macros
 
 | FUNCTION                  | DESCRIPTION                                             |
 | ------------------------- | ------------------------------------------------------- |
-| `val = rpn(expr)`         | evaluate a raw RPN expression and return the result     |
 | `addr = alloca(size)`     | allocate `size` bytes on the stack and return a pointer to it |
 | `addr = array(...)`       | allocate an array in the stack and return a pointer to it     |
 | `size = sizeof(struct)`   | return the size of a struct in bytes                    |
@@ -200,6 +199,19 @@ switch var {
 | `dump(num)`               | print the decimal value of `num` to the emulator stdout |
 | `memset(addr, val, size)` | set `size` bytes of memory at `addr` to `val`           |
 | `memmov(dest, src, size)` | copy `size` bytes from `src` to `dest`                  |
+|                           |                                                         |
+| `val = _lRNP(expr)`       | evaluate a raw RPN expression and return the result     |
+| `res = _lNOVA(f, ac, ap)` | call a vafunc `f` as a normal function with `ac` arguments and `ap` pointer to the first argument |
+
+| MACRO                     | DESCRIPTION                                             |
+| ------------------------- | ------------------------------------------------------- |
+| `NULL`                    | null pointer (`0`)                                      |
+| `INTMAX`                  | maximum integer value (`0xFFFF`)                        |
+|                           |                                                         |
+| `_lCOMPILER`              | compiler name and version as a string (e. `"llc 1.0"`)  |
+| `_lARCH`                  | architecture version (e. `0x0110`)                      |
+| `_lSCREEN`                | address of the screen in memory (`0xF830`)              |
+| `_lSP`                    | address of the stack pointer in memory                  |
 
 ## Computer architecture
 

@@ -1,4 +1,4 @@
-dump(_get_sp())
+dump([_lSP])
 
 sub {
     : ptr = alloca(10)
@@ -16,7 +16,7 @@ sub {
     }
 
 
-    dump(_get_sp())
+    dump([_lSP])
 }
 
-dump(_get_sp())
+dump([_lSP])

@@ -1,6 +1,6 @@
 :var
 
-dump(_get_sp())
+dump([_lSP])
 
 var = 7
 
@@ -14,4 +14,4 @@ if var == 5 {
 
 dump(123)
 
-dump(_get_sp())
+dump([_lSP])

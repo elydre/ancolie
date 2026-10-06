@@ -1,51 +1,51 @@
 :i
 
-dump(_get_sp())
+dump([_lSP])
 
 if (1) {
     dump(1)
-    dump(_get_sp())
+    dump([_lSP])
 }
 
 if (0) {
 } else {
     dump(2)
-    dump(_get_sp())
+    dump([_lSP])
 }
 
 while (1) {
     dump(3)
-    dump(_get_sp())
+    dump([_lSP])
     break
 }
 
 for i (0) {
     dump(4)
-    dump(_get_sp())
+    dump([_lSP])
     break
 }
 
 for i (0, 10) {
     dump(5)
-    dump(_get_sp())
+    dump([_lSP])
     break
 }
 
 for i (0, 10, 2) {
     dump(6)
-    dump(_get_sp())
+    dump([_lSP])
     break
 }
 
 sub {
     dump(7)
-    dump(_get_sp())
+    dump([_lSP])
 }
 
 switch (1) {
     case 1 {
         dump(8)
-        dump(_get_sp())
+        dump([_lSP])
     }
 }
 
@@ -54,7 +54,7 @@ switch (0) {
     }
     default {
         dump(9)
-        dump(_get_sp())
+        dump([_lSP])
     }
 }
 
@@ -63,6 +63,6 @@ switch (12) {
     }
     default {
         dump(9)
-        dump(_get_sp())
+        dump([_lSP])
     }
 }

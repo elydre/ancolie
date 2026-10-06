@@ -1,0 +1,13 @@
+vafunc test(argc, [argv]) {
+    : i
+
+    dump(argc)
+    for i (0, argc) {
+        dump([argv + i])
+    }
+}
+
+: argv = array(1, 2, 3)
+
+test(1, 2, 3)
+_lNOVA(test, 3, argv)

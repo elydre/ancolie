@@ -25,7 +25,7 @@ def compile_assembly(lines):
             if not utl.is_valid_name(tokens[0]):
                 utl.say_error(f"Invalid label name: {tokens[0]}")
             if output.does_label_exist(label):
-                utl.say_error(f"Label already exists: {tokens[0]}")
+                utl.say_error(f"Label '{tokens[0]}' already exists: ")
             output.add_label(label)
             continue
 
@@ -140,11 +140,11 @@ def compile_line(lines: list, labels: tuple, tree: list):
             var_name = tokens[ptrlvl]
 
             # check if the variable already exists
-            if defs.is_variable(var_name):
-                utl.say_error(f"Variable already exists: {tokens[ptrlvl]}")
-
             if not utl.is_valid_name(var_name):
-                utl.say_error(f"Invalid variable name: {tokens[ptrlvl]}")
+                utl.say_error(f"Invalid variable name: '{var_name}'")
+
+            if defs.is_variable(var_name):
+                utl.say_error(f"Variable '{tokens[ptrlvl]}' already exists: ")
 
             if def_char == conf.NEW_VAR:
                 v = defs.variable(var_name, ptrlvl)
@@ -166,7 +166,7 @@ def compile_line(lines: list, labels: tuple, tree: list):
                     break
 
             else:
-                if len(tokens) > end_brackets:
+                if len(tokens) > end_brackets and tokens[end_brackets] == '=':
                     if tokens[end_brackets] != '=' or len(tokens) != end_brackets + 2 or not utl.is_number(tokens[end_brackets + 1]):
                         utl.say_error(f"Bad static variable declaration, only const expected", correct_syntax = f"{tokens[0]} = 123")
                     val = utl.to_number(tokens[end_brackets + 1])
@@ -279,7 +279,7 @@ def compile_line(lines: list, labels: tuple, tree: list):
         next_tokens = None
         while closing_line + 1 < len(lines) and lines[closing_line + 1][1][0] in ("elif", "else"):
             defs.CURRENT_LNO, next_tokens = lines[closing_line + 1]
-            
+
             output.add_goto(
                 fin_label, (1, 0)) # unconditional jump to the end of the if block
             output.add_label(next_label)
@@ -369,12 +369,12 @@ def compile_line(lines: list, labels: tuple, tree: list):
             utl.say_error("Bad syntax in for loop", correct_syntax = "for var (0, 10)")
 
         if not defs.is_variable(tokens[1]):
-            utl.say_error(f"For loop variable must be a declared variable: {tokens[1]}", correct_syntax = ":var ; for var (0, 10)")
+            utl.say_error(f"For loop variable '{tokens[1]}' must be a declared variable", correct_syntax = ":var ; for var (0, 10)")
 
         v = defs.get_variable(tokens[1])
 
         if v.is_static:
-            utl.say_error(f"For loop variable must be a local variable: {tokens[1]}", correct_syntax = ":var ; for var (0, 10)")
+            utl.say_error(f"For loop variable '{tokens[1]}' must be a local variable", correct_syntax = ":var ; for var (0, 10)")
 
         args = toks.split_func_args(tokens[3:-1])
 
@@ -453,9 +453,6 @@ def compile_line(lines: list, labels: tuple, tree: list):
         if not utl.is_valid_name(tokens[1]):
             utl.say_error(f"Invalid function name: {tokens[1]}")
 
-        if defs.is_func(tokens[1]):
-            utl.say_error(f"Function already exists: {tokens[1]}")
-
         args = toks.split_func_args(tokens[3:-1])
         new_scope = f"func_{tokens[1]}"
 
@@ -481,16 +478,32 @@ def compile_line(lines: list, labels: tuple, tree: list):
         if tokens[0] == "vafunc" and len(args) != 2:
             utl.say_error("Variable argument function must have 2 arguments (arg count and arg pointer)", correct_syntax = "vafunc func_name(argc, argp)")
 
+        if len(lines) < 2 or lines[1][1] != ['{']:
+            # function prototype
+            f = defs.func(tokens[1], len(args), is_vaargs = (tokens[0] == "vafunc"))
+            f.add()
+            return (output, 1)
+
+        # function definition
+        if defs.is_func(tokens[1]):
+            f = defs.get_func(tokens[1])
+            if f.opcodes is not None:
+                utl.say_error(f"Function '{tokens[1]}' already defined")
+            if f.argc != len(args) or f.is_vaargs != (tokens[0] == "vafunc"):
+                utl.say_error(f"Function '{tokens[1]}' prototype does not match definition")
+        else:
+            f = defs.func(tokens[1], len(args), is_vaargs = (tokens[0] == "vafunc"))
+            f.add()
+
         # compile the lines inside the function block
         closing_line = toks.locate_braces(lines)
         func_lines = lines[2:closing_line]
 
         # check if the function has a return statement, if not add a return at the end
-        if func_lines[-1][1][0] != "return":
+        if len(func_lines) == 0:
+            func_lines.append((defs.CURRENT_LNO, ["return"]))
+        elif func_lines[-1][1][0] != "return":
             func_lines.append((func_lines[-1][0], ["return"]))
-
-        f = defs.func(tokens[1], len(args), is_vaargs = (tokens[0] == "vafunc"))
-        f.add()
 
         inner_output = out.output_code()
         inner_output.add_label(new_scope)
@@ -767,7 +780,7 @@ def compile(lines: str, path: str = None, use_header: bool = False):
         if f.is_builtin:
             continue
         if f.opcodes is None:
-            utl.say_error(f"Function {f.name} has no opcodes")
+            utl.say_error(f"Function '{f.name}' never defined")
         output.atend(f.opcodes)
 
     output.atdebut(op.init())

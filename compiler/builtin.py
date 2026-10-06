@@ -24,6 +24,17 @@ def blt_rpn(args: list, dest):
 
     return output
 
+def blt_nova(args: list, dest):
+    if len(args[0]) != 1 or not defs.is_func(args[0][0]):
+        utl.say_error(f"_lNOVA() expects a vafunc name as first argument")
+
+    f = defs.get_func(args[0][0])
+
+    if not f.is_vaargs:
+        utl.say_error(f"_lNOVA() expects a vafunc name as first argument")
+
+    return op.call_func(f, args[1] + [","] + args[2], dest, force_novaargs=True)
+
 def blt_alloca(args: list, dest):
     output = out.output_code()
     # calculate the requested size in bytes
@@ -144,7 +155,8 @@ def add_builtin_functions():
     def new_builtin(name, args, does_return, func, no_rpn=False, is_vaargs=False):
         return defs.func(name, args, does_return, True, func, no_rpn, is_vaargs).add()
 
-    new_builtin("rpn",    1, True,  blt_rpn)
+    new_builtin("_lRPN",  1, True,  blt_rpn)
+    new_builtin("_lNOVA", 3, True,  blt_nova)
     new_builtin("alloca", 1, True,  blt_alloca, no_rpn=True)
     new_builtin("array",  0, True,  blt_array, no_rpn=True, is_vaargs=True)
     new_builtin("sizeof", 1, True,  blt_sizeof)

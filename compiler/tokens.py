@@ -118,7 +118,7 @@ def tokenize_lines(lines: str, filename: str):
 def locate_braces(lines, current_line: int = 0):
      # find the opening brace '{'
     if current_line + 1 >= len(lines) or lines[current_line + 1][1] != ['{']:
-        utl.say_error("Bad syntax\nExpected '{' after 'if' statement")
+        utl.say_error("Bad syntax, expected '{'" + f" after '{lines[current_line][0]}' statement")
 
     # find the closing brace '}'
     closing_line = current_line + 2
@@ -133,7 +133,7 @@ def locate_braces(lines, current_line: int = 0):
             opening_braces += 1
         closing_line += 1
     else:
-        utl.say_error("Bad syntax\nExpected '}' after 'if' block")
+        utl.say_error("Bad syntax, expected '}'" + f" after '{lines[current_line][0]}' block")
 
     return closing_line
 

@@ -2,9 +2,9 @@ func coucou(oui, non) {
     return oui + non
 }
 
-dump(_get_sp())
+dump([_lSP])
 
 dump(coucou(1, 2))
 dump(coucou(3, 6))
 
-dump(_get_sp())
+dump([_lSP])

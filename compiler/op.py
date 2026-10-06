@@ -436,13 +436,18 @@ def load_fieldaddr(tokens: list):
 
     return (output, end + 3)
 
-def call_func(f: defs.func, tokens: list, dest = None):
+def call_func(f: defs.func, tokens: list, dest = None, force_novaargs = False):
+    if f.is_vaargs and not force_novaargs:
+        is_vaargs = True
+    else:
+        is_vaargs = False
+
     args = toks.split_func_args(tokens)
 
     if (dest is not None) and (not isinstance(dest, tuple)) and (dest != "push"):
         utl.say_error(f"Invalid destination for function return value: {dest}", internal=True)
 
-    if not f.is_vaargs and len(args) != f.argc:
+    if not is_vaargs and len(args) != f.argc:
         utl.say_error(f"Wrong number of arguments for function {f.name}", correct_syntax = f"{f.name}({', '.join(['var' + str(i + 1) for i in range(f.argc)])})")
 
     if f.is_builtin:
@@ -455,7 +460,7 @@ def call_func(f: defs.func, tokens: list, dest = None):
 
     end_label = utl.get_new_label()
 
-    if f.is_vaargs:
+    if is_vaargs:
         for arg in args[::-1]:
             output.atend(op.calculate_expr(arg))
 
@@ -466,7 +471,7 @@ def call_func(f: defs.func, tokens: list, dest = None):
             (0, defs.STACK_DEBUT_PTR))
 
     # push the arguments to the stack
-    if f.is_vaargs:
+    if is_vaargs:
         output.add("mov",
                 (0, defs.STACK_DEBUT_PTR),
                 (0, defs.STACK_PTR))
@@ -494,7 +499,7 @@ def call_func(f: defs.func, tokens: list, dest = None):
 
     output.add_label(end_label)
 
-    if f.is_vaargs:
+    if is_vaargs:
         output.add("add",
                 (0, defs.STACK_PTR),
                 (1, utl.to_u16(len(args) + 1))) # pop the arguments
