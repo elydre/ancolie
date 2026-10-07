@@ -30,6 +30,7 @@ func malloc_init(debut, size, block_size) {
     malloc_data.size = size
     malloc_data.block_size = block_size
     malloc_data.index_size = needed
+    malloc_data.malloc_count = 0
 }
 
 func malloc(size) {
@@ -88,9 +89,19 @@ func free(addr) {
     : debut_index
     : size i j
 
+    dump(666)
     dump(addr)
 
+    if (addr == 0) {
+        return
+    }
     addr = addr - 2
+
+    if (addr < malloc_data.debut + malloc_data.index_size || addr >= malloc_data.debut + malloc_data.index_size + malloc_data.size) {
+        dump(3456)
+        return
+    }
+
     if ([addr] != MALLOC_MAGIC) {
         dump(5678)
         return
@@ -107,7 +118,7 @@ func free(addr) {
         for j (debut_index, 16) {
             [i] = [i] &b ~(1 << j)
             size = size - malloc_data.block_size
-            if (size <= 0) {
+            if (size == 0 || (size > INTMAX - malloc_data.block_size)) {
                 malloc_data.malloc_count = malloc_data.malloc_count - 1
                 return
             }

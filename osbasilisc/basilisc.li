@@ -1,14 +1,14 @@
-#define BASILISC_VERSION "0.2"
+#define BASILISC_VERSION "0.3"
 
 // word types
 #define WORD_NONE 0
 #define WORD_VAR  1
-#define WORD_STR  2
-#define WORD_NUM  3
+#define WORD_NUM  2
+#define WORD_STR  3
+#define WORD_FSTR 4
 
-#define WORD_FIRST_INST 4
+#define WORD_FIRST_INST 5
 
-#define WORD_INST_INPUT 4
 #define WORD_INST_PRINT 5
 #define WORD_INST_WRITE 6
 #define WORD_INST_GOTO  7
@@ -18,7 +18,7 @@
 #define WORD_INST_LEN   11
 #define WORD_INST_THEN  12
 #define WORD_INST_LT    13
-#define WORD_INST_PLUS  14
+#define WORD_INST_ADD   14
 #define WORD_INST_EQ    15
 #define WORD_INST_MOD   16
 #define WORD_INST_ED    17
@@ -29,8 +29,8 @@
 
 #define VAARG_FUNC 10
 
-#define VAR_STR WORD_STR
-#define VAR_NUM WORD_NUM
+#define VAR_NUM  WORD_NUM
+#define VAR_STR  WORD_STR
 
 // execution return values
 #define EXEC_END      0xFFFF
@@ -83,10 +83,9 @@ vafunc say_error(argc, [argp]) {
 $ [g_var_tail] = NULL // var_s
 $ [[g_instructions]]
 
-#define INSTRCTIONS_COUNT 18
+#define INSTRCTIONS_COUNT 17
 
 g_instructions = array(
-    WORD_INST_INPUT, "INPUT", 1,
     WORD_INST_PRINT, "PRINT", VAARG_FUNC,
     WORD_INST_WRITE, "WRITE", VAARG_FUNC,
     WORD_INST_GOTO,  "GOTO",  1,
@@ -96,7 +95,7 @@ g_instructions = array(
     WORD_INST_LEN,   "LEN",   1,
     WORD_INST_THEN,  "THEN",  VAARG_FUNC,
     WORD_INST_LT,    "<",     2,
-    WORD_INST_PLUS,  "+",     2,
+    WORD_INST_ADD,   "+",     2,
     WORD_INST_EQ,    "==",    2,
     WORD_INST_MOD,   "%",     2,
     WORD_INST_ED,    "ED",    0,
@@ -309,7 +308,7 @@ func parse_str([str], length, [word]) { // word_s[word]
         if (word == NULL) {
             word = new_word(1)
         }
-        word_s[word].type = WORD_STR
+        word_s[word].type = WORD_FSTR
         word_s[word].value = strndup(str + 1, end - 2)
         return word
     } elif (isnumber(str, end)) {
@@ -456,16 +455,25 @@ func print_word([word]) { // word_s[word]
         printf("( ")
     }
 
-    if (word_s[word].type == WORD_NONE) {
-        printf("None ")
-    } elif (word_s[word].type == WORD_VAR) {
-        printf("[var %s] ", var_s[word_s[word].value].name)
-    } elif (word_s[word].type == WORD_STR) {
-        printf("\"%s\" ", word_s[word].value)
-    } elif (word_s[word].type == WORD_NUM) {
-        printf("%d ", word_s[word].value)
-    } else {
-        printf("%s ", get_instruction_name(word_s[word].type))
+    switch (word_s[word].type) {
+        case WORD_NONE {
+            printf("None ")
+        }
+        case WORD_VAR {
+            printf("[var %s] ", var_s[word_s[word].value].name)
+        }
+        case WORD_STR {
+            printf("\"%s\" ", word_s[word].value)
+        }
+        case WORD_FSTR {
+            printf("f\"%s\" ", word_s[word].value)
+        }
+        case WORD_NUM {
+            printf("%d ", word_s[word].value)
+        }
+        default {
+            printf("%s ", get_instruction_name(word_s[word].type))
+        }
     }
 
     if (word_s[word].type < WORD_FIRST_INST) {
@@ -482,19 +490,20 @@ func print_word([word]) { // word_s[word]
 
 func program_run() // prototype
 
+#define is_str_arg(arg) (word_s[arg].type == WORD_STR || word_s[arg].type == WORD_FSTR)
+
 func execute_word([word], [return_value]) {
-    if (return_value) {
-        word_s[return_value].type = WORD_NONE
-    }
+    word_s[return_value].type = WORD_NONE
 
     : args = alloca(sizeof(word_s) * (VAARG_FUNC + 1))
     : argc = 0
     : a i = 0
+    : retcode = EXEC_CONTINUE
 
     if (word_s[word].type >= WORD_FIRST_INST) {
         while (word_s[word_s[word].value + i].type != WORD_NONE) {
             if (argc >= VAARG_FUNC) {
-                say_error("XX too many arguments\n")
+                say_error("should not happen, too many arguments\n")
                 return EXEC_ERROR
             }
             if (word_s[word_s[word].value + i].type == WORD_VAR) {
@@ -521,27 +530,22 @@ func execute_word([word], [return_value]) {
 
     switch (word_s[word].type) {
         case WORD_VAR {
-            if (return_value) {
-                word_s[return_value].type  = var_s[word_s[word].value].type
-                word_s[return_value].value = var_s[word_s[word].value].value
-            }
+            word_s[return_value].type  = var_s[word_s[word].value].type
+            word_s[return_value].value = var_s[word_s[word].value].value
         }
-        case WORD_STR {
-            if (return_value) {
-                word_s[return_value].type  = WORD_STR
-                word_s[return_value].value = strdup(word_s[word].value)
-            }
+
+        case WORD_STR, WORD_FSTR, WORD_NUM {
+            word_s[return_value].type  = word_s[word].type
+            word_s[return_value].value = word_s[word].value
         }
-        case WORD_NUM {
-            if (return_value) {
-                word_s[return_value].type  = WORD_NUM
-                word_s[return_value].value = word_s[word].value
-            }
-        }
+
         case WORD_INST_PRINT, WORD_INST_WRITE {
             for i (0, argc * sizeof(word_s), sizeof(word_s)) {
                 switch (word_s[args + i].type) {
                     case WORD_STR {
+                        printf("%s", word_s[args + i].value)
+                    }
+                    case WORD_FSTR {
                         printf("%s", word_s[args + i].value)
                     }
                     case WORD_NUM {
@@ -564,30 +568,34 @@ func execute_word([word], [return_value]) {
         }
 
         case WORD_INST_LEN {
-            if (word_s[args].type == WORD_STR) {
-                if (return_value) {
-                    word_s[return_value].type  = WORD_NUM
-                    word_s[return_value].value = strlen(word_s[args].value)
-                }
-            } else {
+            if (word_s[args].type != WORD_STR && word_s[args].type != WORD_FSTR) {
                 say_error("'LEN' expects a string argument\n")
-                return EXEC_ERROR
+                retcode = EXEC_ERROR
+            } else {
+                word_s[return_value].type  = WORD_NUM
+                word_s[return_value].value = strlen(word_s[args].value)
             }
         }
 
         case WORD_INST_STOP {
-            return EXEC_END
+            retcode = EXEC_END
         }
 
         case WORD_INST_LET {
             if (word_s[args].type != WORD_VAR) {
                 say_error("'LET' expects a variable as first argument\n")
-                return EXEC_ERROR
+                retcode = EXEC_ERROR
+                break
             }
             switch (word_s[args + sizeof(word_s)].type) {
                 case WORD_STR {
                     var_s[word_s[args].value].type  = VAR_STR
                     var_s[word_s[args].value].value = strdup(word_s[args + sizeof(word_s)].value)
+                }
+                case WORD_FSTR {
+                    var_s[word_s[args].value].type  = VAR_STR
+                    var_s[word_s[args].value].value = word_s[args + sizeof(word_s)].value
+                    return EXEC_CONTINUE // skip freeing the string, it's now owned by the variable
                 }
                 case WORD_NUM {
                     var_s[word_s[args].value].type  = VAR_NUM
@@ -595,7 +603,7 @@ func execute_word([word], [return_value]) {
                 }
                 default {
                     say_error("'LET' expects a string or number as second argument\n")
-                    return EXEC_ERROR
+                    retcode = EXEC_ERROR
                 }
             }
         }
@@ -606,53 +614,61 @@ func execute_word([word], [return_value]) {
 
         case WORD_INST_IF {
             if ((word_s[args].type == WORD_NUM && word_s[args].value) || (word_s[args].type == WORD_STR && [word_s[args].value])) {
-                a = execute_word(word_s[word].value + sizeof(word_s), NULL)
-                if (a != EXEC_CONTINUE) {
-                    return a
-                }
+                retcode = execute_word(word_s[word].value + sizeof(word_s), NULL)
             }
         }
 
         case WORD_INST_GOTO {
             if (word_s[args].type != WORD_NUM) {
                 say_error("'GOTO' expects a number as argument\n")
-                return EXEC_ERROR
-            }
-            if (word_s[args].value < 0 || word_s[args].value >= 100 || [GOTO_TABLE + word_s[args].value] == 0xFFFF) {
+                retcode = EXEC_ERROR
+            } elif (word_s[args].value < 0 || word_s[args].value >= 100 || [GOTO_TABLE + word_s[args].value] == 0xFFFF) {
                 say_error("label '%d' is not defined\n", word_s[args].value)
-                return EXEC_ERROR
+                retcode = EXEC_ERROR
+            } else {
+                retcode = [GOTO_TABLE + word_s[args].value]
             }
-            return [GOTO_TABLE + word_s[args].value]
         }
 
         case WORD_INST_LT {
             if (word_s[args].type != WORD_NUM || word_s[args + sizeof(word_s)].type != WORD_NUM) {
                 say_error("'<' expects two number arguments\n")
-                return EXEC_ERROR
-            }
-            if (return_value) {
+                retcode = EXEC_ERROR
+            } else {
                 word_s[return_value].type = WORD_NUM
                 word_s[return_value].value = word_s[args].value < word_s[args + sizeof(word_s)].value
             }
         }
 
-        case WORD_INST_PLUS {
-            if (word_s[args].type != WORD_NUM || word_s[args + sizeof(word_s)].type != WORD_NUM) {
-                say_error("'+' expects two number arguments\n")
-                return EXEC_ERROR
-            }
-            if (return_value) {
+        case WORD_INST_ADD {
+            if (is_str_arg(args) && is_str_arg(args + sizeof(word_s))) {
+                : [str1] = word_s[args].value
+                : [str2] = word_s[args + sizeof(word_s)].value
+                : len1 = strlen(str1)
+                : len2 = strlen(str2)
+
+                : [new_str] = malloc(len1 + len2 + 1)
+
+                memmov(new_str, str1, len1)
+                memmov(new_str + len1, str2, len2)
+                [new_str + len1 + len2] = '\0'
+
+                word_s[return_value].type = WORD_FSTR
+                word_s[return_value].value = new_str
+            } elif (word_s[args].type == WORD_NUM && word_s[args + sizeof(word_s)].type == WORD_NUM) {
                 word_s[return_value].type = WORD_NUM
                 word_s[return_value].value = word_s[args].value + word_s[args + sizeof(word_s)].value
+            } else {
+                say_error("'+' expects two number or two string\n")
+                retcode = EXEC_ERROR
             }
         }
 
         case WORD_INST_EQ {
             if (word_s[args].type != WORD_NUM || word_s[args + sizeof(word_s)].type != WORD_NUM) {
                 say_error("'+' expects two number arguments\n")
-                return EXEC_ERROR
-            }
-            if (return_value) {
+                retcode = EXEC_ERROR
+            } else {
                 word_s[return_value].type = WORD_NUM
                 word_s[return_value].value = word_s[args].value == word_s[args + sizeof(word_s)].value
             }
@@ -661,9 +677,8 @@ func execute_word([word], [return_value]) {
         case WORD_INST_MOD {
             if (word_s[args].type != WORD_NUM || word_s[args + sizeof(word_s)].type != WORD_NUM) {
                 say_error("'%%' expects two number arguments\n")
-                return EXEC_ERROR
-            }
-            if (return_value) {
+                retcode = EXEC_ERROR
+            } else {
                 word_s[return_value].type = WORD_NUM
                 word_s[return_value].value = word_s[args].value % word_s[args + sizeof(word_s)].value
             }
@@ -737,10 +752,16 @@ func execute_word([word], [return_value]) {
 
         default {
             say_error("instruction '%s' (%d) is not implemented\n", get_instruction_name(word_s[word].type), word_s[word].type)
-            return EXEC_ERROR
+            retcode = EXEC_ERROR
         }
     }
-    return EXEC_CONTINUE
+    for i (0, argc * sizeof(word_s), sizeof(word_s)) {
+        if (word_s[args + i].type == WORD_FSTR) {
+            free(word_s[args + i].value)
+        }
+    }
+
+    return retcode
 }
 
 func program_run() {
@@ -793,8 +814,12 @@ func program_run() {
     // }
 
     i = 0
+    : [res] = alloca(sizeof(word_s))
     while (i < line_count) {
-        : a = execute_word([lines + i], NULL)
+        : a = execute_word([lines + i], res)
+        if (word_s[res].type == WORD_FSTR) {
+            free(word_s[res].value)
+        }
 
         if (a == EXEC_ERROR) {
             printf("on ", i + 1)
@@ -866,6 +891,17 @@ func main() {
     while (i < line_count) {
         : a = execute_word([lines + i], res)
 
+        if (word_s[res].type != WORD_NONE) {
+            screen_color = 0x0700
+            print("=> ")
+            print_word(res)
+            screen_color = 0x0F00
+            if (word_s[res].type == WORD_FSTR) {
+                free(word_s[res].value)
+            }
+            print("\n")
+        }
+
         if (a == EXEC_ERROR) {
             print("on ")
             print_word([lines + i])
@@ -876,16 +912,6 @@ func main() {
         } elif (a != EXEC_CONTINUE) {
             i = a
         } else {
-            if (word_s[res].type != WORD_NONE) {
-                screen_color = 0x0700
-                print("=> ")
-                print_word(res)
-                screen_color = 0x0F00
-                if (word_s[res].type == WORD_STR) {
-                    free(word_s[res].value)
-                }
-                print("\n")
-            }
             i++
         }
     }
