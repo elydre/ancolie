@@ -26,6 +26,31 @@
 #define WORD_INST_NEW   19
 #define WORD_INST_HELP  20
 #define WORD_INST_SSTAT 21
+#define WORD_INST_INC   22
+#define WORD_INST_DEC   23
+#define WORD_INST_MUL   24
+#define WORD_INST_DIV   25
+#define WORD_INST_SUB   26
+#define WORD_INST_AND   27
+#define WORD_INST_OR    28
+#define WORD_INST_NEQ   29
+#define WORD_INST_GT    30
+#define WORD_INST_ELSE  31
+#define WORD_INST_WHILE 32
+#define WORD_INST_PIN   33 // port in
+#define WORD_INST_POUT  34 // port out
+#define WORD_INST_RAND  35
+#define WORD_INST_SRAND 36
+#define WORD_INST_BSHL  37
+#define WORD_INST_BSHR  38
+#define WORD_INST_BAND  39
+#define WORD_INST_BOR   40
+#define WORD_INST_BXOR  41
+#define WORD_INST_STR   42
+#define WORD_INST_INT   43
+#define WORD_INST_INPUT 44
+#define WORD_INST_RMEM  45
+#define WORD_INST_WMEM  46
 
 #define VAARG_FUNC 10
 
@@ -83,26 +108,51 @@ vafunc say_error(argc, [argp]) {
 $ [g_var_tail] = NULL // var_s
 $ [[g_instructions]]
 
-#define INSTRCTIONS_COUNT 17
+#define INSTRCTIONS_COUNT 42
 
 g_instructions = array(
-    WORD_INST_PRINT, "PRINT", VAARG_FUNC,
-    WORD_INST_WRITE, "WRITE", VAARG_FUNC,
+    WORD_INST_ADD,   "+",     2,
+    WORD_INST_SUB,   "-",     2,
+    WORD_INST_MUL,   "*",     2,
+    WORD_INST_DIV,   "/",     2,
+    WORD_INST_MOD,   "%",     2,
+    WORD_INST_LT,    "<",     2,
+    WORD_INST_GT,    ">",     2,
+    WORD_INST_EQ,    "==",    2,
+    WORD_INST_NEQ,   "!=",    2,
+    WORD_INST_AND,   "AND",   2,
+    WORD_INST_OR,    "OR",    2,
+    WORD_INST_BSHL,  "<<",    2,
+    WORD_INST_BSHR,  ">>",    2,
+    WORD_INST_BAND,  "&",     2,
+    WORD_INST_BOR,   "|",     2,
+    WORD_INST_BXOR,  "^",     2,
+    WORD_INST_STR,   "STR",   1,
+    WORD_INST_INT,   "INT",   1,
+    WORD_INST_LEN,   "LEN",   1,
+    WORD_INST_LET,   "LET",   2,
+    WORD_INST_INC,   "INC",   1,
+    WORD_INST_DEC,   "DEC",   1,
     WORD_INST_GOTO,  "GOTO",  1,
     WORD_INST_IF,    "IF",    2,
-    WORD_INST_STOP,  "STOP",  0,
-    WORD_INST_LET,   "LET",   2,
-    WORD_INST_LEN,   "LEN",   1,
     WORD_INST_THEN,  "THEN",  VAARG_FUNC,
-    WORD_INST_LT,    "<",     2,
-    WORD_INST_ADD,   "+",     2,
-    WORD_INST_EQ,    "==",    2,
-    WORD_INST_MOD,   "%",     2,
+    WORD_INST_ELSE,  "ELSE",  VAARG_FUNC,
+    WORD_INST_WHILE, "WHILE", 2,
+    WORD_INST_PRINT, "PRINT", VAARG_FUNC,
+    WORD_INST_WRITE, "WRITE", VAARG_FUNC,
+    WORD_INST_INPUT, "INPUT", 1,
+    WORD_INST_RAND,  "RAND",  0,
+    WORD_INST_SRAND, "SRAND", 1,
+    WORD_INST_PIN,   "PIN",   1,
+    WORD_INST_POUT,  "POUT",  2,
+    WORD_INST_RMEM,  "RMEM",  1,
+    WORD_INST_WMEM,  "WMEM",  2,
+    WORD_INST_STOP,  "STOP",  0,
     WORD_INST_ED,    "ED",    0,
     WORD_INST_RUN,   "RUN",   0,
     WORD_INST_NEW,   "NEW",   0,
     WORD_INST_HELP,  "HELP",  0,
-    WORD_INST_SSTAT, "SSTAT", 0
+    WORD_INST_SSTAT, "SSTAT", 0,
 )
 
 func new_word(count) {
@@ -507,7 +557,7 @@ func execute_word([word], [return_value]) {
                 return EXEC_ERROR
             }
             if (word_s[word_s[word].value + i].type == WORD_VAR) {
-                if (word_s[word].type == WORD_INST_LET) {
+                if (word_s[word].type == WORD_INST_LET || word_s[word].type == WORD_INST_INC || word_s[word].type == WORD_INST_DEC) {
                     word_s[args + i].type  = word_s[word_s[word].value + i].type
                     word_s[args + i].value = word_s[word_s[word].value + i].value
                 } else {
@@ -587,6 +637,9 @@ func execute_word([word], [return_value]) {
                 retcode = EXEC_ERROR
                 break
             }
+            if (var_s[word_s[args].value].type == VAR_STR) {
+                free(var_s[word_s[args].value].value)
+            }
             switch (word_s[args + sizeof(word_s)].type) {
                 case WORD_STR {
                     var_s[word_s[args].value].type  = VAR_STR
@@ -603,6 +656,8 @@ func execute_word([word], [return_value]) {
                 }
                 default {
                     say_error("'LET' expects a string or number as second argument\n")
+                    var_s[word_s[args].value].type  = VAR_NUM
+                    var_s[word_s[args].value].value = 0
                     retcode = EXEC_ERROR
                 }
             }
@@ -682,6 +737,158 @@ func execute_word([word], [return_value]) {
                 word_s[return_value].type = WORD_NUM
                 word_s[return_value].value = word_s[args].value % word_s[args + sizeof(word_s)].value
             }
+        }
+
+        case WORD_INST_INC {
+            if (word_s[args].type != WORD_VAR) {
+                say_error("'INC' expects a variable as first argument\n")
+                retcode = EXEC_ERROR
+                break
+            }
+            if (var_s[word_s[args].value].type != VAR_NUM) {
+                say_error("'INC' expects a number variable\n")
+                retcode = EXEC_ERROR
+                break
+            }
+            var_s[word_s[args].value].value = var_s[word_s[args].value].value + 1
+        }
+
+        case WORD_INST_DEC {
+            if (word_s[args].type != WORD_VAR) {
+                say_error("'DEC' expects a variable as first argument\n")
+                retcode = EXEC_ERROR
+                break
+            }
+            if (var_s[word_s[args].value].type != VAR_NUM) {
+                say_error("'DEC' expects a number variable\n")
+                retcode = EXEC_ERROR
+                break
+            }
+            var_s[word_s[args].value].value = var_s[word_s[args].value].value - 1
+        }
+
+        case WORD_INST_MUL {
+            say_error("ni\n")
+            retcode = EXEC_ERROR
+        }
+
+        case WORD_INST_DIV {
+            say_error("ni\n")
+            retcode = EXEC_ERROR
+        }
+
+        case WORD_INST_SUB {
+            say_error("ni\n")
+            retcode = EXEC_ERROR
+        }
+
+        case WORD_INST_AND {
+            say_error("ni\n")
+            retcode = EXEC_ERROR
+        }
+
+        case WORD_INST_OR {
+            say_error("ni\n")
+            retcode = EXEC_ERROR
+        }
+
+        case WORD_INST_NEQ {
+            say_error("ni\n")
+            retcode = EXEC_ERROR
+        }
+
+        case WORD_INST_GT {
+            say_error("ni\n")
+            retcode = EXEC_ERROR
+        }
+
+        case WORD_INST_ELSE {
+            say_error("ni\n")
+            retcode = EXEC_ERROR
+        }
+
+        case WORD_INST_WHILE {
+            say_error("ni\n")
+            retcode = EXEC_ERROR
+        }
+
+        case WORD_INST_PIN {
+            say_error("ni\n")
+            retcode = EXEC_ERROR
+        }
+
+        case WORD_INST_POUT {
+            say_error("ni\n")
+            retcode = EXEC_ERROR
+        }
+
+        case WORD_INST_RAND {
+            say_error("ni\n")
+            retcode = EXEC_ERROR
+        }
+
+        case WORD_INST_SRAND {
+            say_error("ni\n")
+            retcode = EXEC_ERROR
+        }
+
+        case WORD_INST_BSHL {
+            say_error("ni\n")
+            retcode = EXEC_ERROR
+        }
+
+        case WORD_INST_BSHR {
+            say_error("ni\n")
+            retcode = EXEC_ERROR
+        }
+
+        case WORD_INST_BAND {
+            say_error("ni\n")
+            retcode = EXEC_ERROR
+        }
+
+        case WORD_INST_BOR {
+            say_error("ni\n")
+            retcode = EXEC_ERROR
+        }
+
+        case WORD_INST_BXOR {
+            say_error("ni\n")
+            retcode = EXEC_ERROR
+        }
+
+        case WORD_INST_STR {
+            say_error("ni\n")
+            retcode = EXEC_ERROR
+        }
+
+        case WORD_INST_INT {
+            say_error("ni\n")
+            retcode = EXEC_ERROR
+        }
+
+        case WORD_INST_INPUT {
+            if (!is_str_arg(args)) {
+                say_error("'INPUT' expects a string argument\n")
+                retcode = EXEC_ERROR
+                break
+            }
+
+            : [input_str] = malloc(64)
+            input(input_str, 64)
+
+            word_s[return_value].type  = WORD_FSTR
+            word_s[return_value].value = input_str
+        }
+
+        case WORD_INST_RMEM {
+            say_error("ni\n")
+            retcode = EXEC_ERROR
+        }
+
+        case WORD_INST_WMEM {
+            say_error("ni\n")
+            retcode = EXEC_ERROR
         }
 
         case WORD_INST_ED {
@@ -918,9 +1125,9 @@ func main() {
 }
 
 print("\n")
-printf("$0F        ___    \\\\\\     $02BASILISC %s\n", BASILISC_VERSION)
-printf("$0F        ). \\   ((°<    2026 elydre\n")
-printf("$0F   ______):.`- //~     \n")
+printf("$0F        ___   \\\\\\     $02BASILISC %s\n", BASILISC_VERSION)
+printf("$0F        ). \\  ((°<    2026 elydre\n")
+printf("$0F   ______):.`-//~     \n")
 printf("$0F     ---==_ __.'       $07Type $0Fhelp$07 for the user guide\n" )
 printf("$0F           TT          $07and press Enter twice.$0F\n\n" )
 
