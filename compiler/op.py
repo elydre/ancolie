@@ -313,6 +313,8 @@ def calculate_expr(rpn: list, is_infix: bool = True):
                 output.add("bor", a, b)
             elif token == '&b':
                 output.add("band", a, b)
+            elif token == '^b':
+                output.add("bxor", a, b)
             elif token == '!':
                 output.add("eq", b, (1, 0))
                 stack_size += 1 # noting consumed
