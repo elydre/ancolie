@@ -61,7 +61,6 @@ func program_edit() {
     : type key
     : line_start line_end column target
 
-    [program] = 0
     editor_redraw(program, length, cursor)
 
     while 1 {

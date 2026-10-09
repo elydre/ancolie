@@ -112,7 +112,7 @@ vafunc say_error(argc, [argp]) {
 
 $ [g_var_tail] = NULL // var_s
 $ [[g_instructions]]
-$ g_debug = 1
+$ g_debug = 0
 
 #define INSTRCTIONS_COUNT 44
 
@@ -445,7 +445,15 @@ func find_matching_parenthesis([str], length) {
     return end
 }
 
-func parse_str([str], length, [word]) { // word_s[word]
+func is_neol([str], length) {
+    : i = 0
+    while (i < length && [str + i] == ' ') {
+        i++
+    }
+    return (i != length)
+}
+
+func parse_str([str], length, [word], need_eol) { // word_s[word]
     while (length > 0 && ([str] == ' ')) {
         str++
         length--
@@ -474,6 +482,10 @@ func parse_str([str], length, [word]) { // word_s[word]
         for i (0, end - 2) {
             [word_s[word].value + i] = [str + i]
         }
+        if (need_eol && is_neol(str + end, length - end)) {
+            say_error("unexpected characters after string\n")
+            return NULL
+        }
         return word
     } elif (isnumber(str, end)) {
         if (word == NULL) {
@@ -481,6 +493,10 @@ func parse_str([str], length, [word]) { // word_s[word]
         }
         word_s[word].type = WORD_NUM
         word_s[word].value = atoi(str)
+        if (need_eol && is_neol(str + end, length - end)) {
+            say_error("unexpected characters after number\n")
+            return NULL
+        }
         return word
     }
 
@@ -511,15 +527,15 @@ func parse_str([str], length, [word]) { // word_s[word]
             word_s[preloaded_word].value = get_variable_or_create(str, end)
             end = debut + 1 // skip '='
         } elif (get_variable(str, end) != NULL) {
-            if (end < length) {
-                say_error("'%S' is a variable, not an instruction\n", str, end)
-                return NULL
-            }
             if (word == NULL) {
                 word = new_word(sizeof(word_s))
             }
             word_s[word].type = WORD_VAR
             word_s[word].value = get_variable(str, end)
+            if (need_eol && is_neol(str + end, length - end)) {
+                say_error("unexpected characters after variable\n")
+                return NULL
+            }
             return word
         } else {
             say_error("'%S' is not a valid instruction\n", str, end)
@@ -581,9 +597,9 @@ func parse_str([str], length, [word]) { // word_s[word]
 
         : [arg]
         if (have_parentheses) {
-            arg = parse_str(str, end - 1, word_s[word].value + (argc * sizeof(word_s)))
+            arg = parse_str(str, end - 1, word_s[word].value + (argc * sizeof(word_s)), 1)
         } else {
-            arg = parse_str(str, length, word_s[word].value + (argc * sizeof(word_s)))
+            arg = parse_str(str, length, word_s[word].value + (argc * sizeof(word_s)), 0)
             if (arg && word_s[arg].type >= WORD_FIRST_INST) {
                 if (expected_args != argc + 1 && expected_args < VAARG) {
                     say_error("'%s' expects %d arguments, got %d\n", get_word_name(type), expected_args, argc + 1)
@@ -603,17 +619,12 @@ func parse_str([str], length, [word]) { // word_s[word]
         argc++
     }
 
-    while (length > 0 && ([str] == ' ')) {
-        str++
-        length--
+    if (is_neol(str, length)) {
+        say_error("'%s' uses %d arguments but %d characters left\n", get_word_name(type), expected_args, length)
+        return NULL
     }
 
-    if (length == 0) {
-        return word
-    }
-
-    say_error("'%s' expects %d arguments, remaining %d characters\n", get_word_name(type), expected_args, length)
-    return NULL
+    return word
 }
 
 #define is_str_arg(arg) (word_s[arg].type == WORD_STR || word_s[arg].type == WORD_FSTR)
@@ -707,9 +718,9 @@ func check_types([word]) {
     if (word_s[word].type == WORD_INST_LET) {
         var = word_s[word_s[word].value].value
         if (var_s[var].type == VAR_NONE) {
-            var_s[var].type = word_s[args].type
-        } elif (var_s[var].type != word_s[args].type) {
-            say_error("variable '%s' has type %s, cannot assign %s\n", var_s[var].name, get_word_name(var_s[var].type), get_word_name(word_s[args].type))
+            var_s[var].type = word_s[args + sizeof(word_s)].type
+        } elif (var_s[var].type != word_s[args + sizeof(word_s)].type) {
+            say_error("variable '%s' has type %s, cannot assign %s\n", var_s[var].name, get_word_name(var_s[var].type), get_word_name(word_s[args + sizeof(word_s)].type))
             return EXEC_ERROR
         }
     }
@@ -849,7 +860,18 @@ func execute_word([word], [return_value]) {
                 say_error("label '%d' is not defined\n", word_s[args].value)
                 retcode = EXEC_ERROR
             } else {
-                retcode = [GOTO_TABLE + word_s[args].value]
+                : val = in(0x1010)
+                while (val) {
+                    if (in(0x1011) == 27 && val == 3) {
+                        printf("$07execution interrupted by user$0F\n")
+                        retcode = EXEC_END
+                        break
+                    }
+                    val = in(0x1010)
+                }
+                if (retcode != EXEC_END) {
+                    retcode = [GOTO_TABLE + word_s[args].value]
+                }
             }
         }
 
@@ -1191,9 +1213,10 @@ func program_run() {
             continue
         }
 
-        [lines + line_count] = parse_str(program, end, NULL)
+        [lines + line_count] = parse_str(program, end, NULL, 1)
 
         if ([lines + line_count] == NULL) {
+            printf("$09on %S$0F\n", program, end)
             return 1
         }
 
@@ -1207,6 +1230,9 @@ func program_run() {
             printf("\n")
         }
         if (check_types([lines + i]) == EXEC_ERROR) {
+            printf("$09on ")
+            print_word([lines + i])
+            printf("$0F\n")
             return
         }
     }
@@ -1220,9 +1246,10 @@ func program_run() {
         }
 
         if (a == EXEC_ERROR) {
-            printf("on ", i + 1)
+            printf("$09on ")
             print_word([lines + i])
-            printf("\n")
+            printf("$0F\n")
+            break
         } elif (a == EXEC_END) {
             break
         } elif (a != EXEC_CONTINUE) {
@@ -1268,7 +1295,7 @@ func shell_iter() {
             continue
         }
 
-        [lines + line_count] = parse_str(strline, end, NULL)
+        [lines + line_count] = parse_str(strline, end, NULL, 1)
 
         if ([lines + line_count]) {
             line_count++
@@ -1285,6 +1312,9 @@ func shell_iter() {
             printf("\n")
         }
         if (check_types([lines + i]) == EXEC_ERROR) {
+            printf("$09on ")
+            print_word([lines + i])
+            printf("$0F\n")
             return
         }
     }
@@ -1306,9 +1336,9 @@ func shell_iter() {
         }
 
         if (a == EXEC_ERROR) {
-            print("on ")
+            printf("$09on ")
             print_word([lines + i])
-            print("\n")
+            printf("$0F\n")
             break
         } elif (a == EXEC_END) {
             break
