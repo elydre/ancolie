@@ -255,25 +255,26 @@ opcode (8 bit)  sources (4 * 2bit)  [  arg0 (16 bit)   ] ... [ arg3 (16 bit)    
 | `0x0F` |  and   | `a` `b`     | `a <- a && b`              |
 | `0x10` |  band  | `a` `b`     | `a <- a & b`               |
 | `0x11` |  bor   | `a` `b`     | `a <- a bor b` (md sorry)  |
-| `0x12` |  bnot  | `a`         | `a <- ~a`                  |
+| `0x12` |  bxor  | `a` `b`     | `a <- a ^ b`               |
+| `0x13` |  bnot  | `a`         | `a <- ~a`                  |
 |        |        |             |                            |
-| `0x13` |  bshl  | `a` `b`     | `a <- a << b`              |
-| `0x14` |  bshr  | `a` `b`     | `a <- a >> b`              |
+| `0x14` |  bshl  | `a` `b`     | `a <- a << b`              |
+| `0x15` |  bshr  | `a` `b`     | `a <- a >> b`              |
 |        |        |             |                            |
-| `0x15` |  jmp   | `a` `b`     | `pc  = a if b == 0`        |
-| `0x16` |  jmpr  | `a` `b`     | `pc += a if b == 0`        |
+| `0x16` |  jmp   | `a` `b`     | `pc  = a if b == 0`        |
+| `0x17` |  jmpr  | `a` `b`     | `pc += a if b == 0`        |
 |        |        |             |                            |
-| `0x17` |  out   | `port` `a`  | output `a` to `port`       |
-| `0x18` |  in    | `a` `port`  | input from `port` to `a`   |
+| `0x18` |  out   | `port` `a`  | output `a` to `port`       |
+| `0x19` |  in    | `a` `port`  | input from `port` to `a`   |
 |        |        |             |                            |
-| `0x19` |  ssp   | `a`         | `sp <- a`                  |
-| `0x1A` |  sup   | `a`         | `up <- a`                  |
+| `0x1A` |  ssp   | `a`         | `sp <- a`                  |
+| `0x1B` |  sup   | `a`         | `up <- a`                  |
 |        |        |             |                            |
-| `0x1B` |  load  | `a` `b`     | `[a] <- [a + b]`           |
-| `0x1C` |  pops  | `a` `b`     | `[a + b] <- [sp]`, `sp++`  |
+| `0x1C` |  load  | `a` `b`     | `[a] <- [a + b]`           |
+| `0x1D` |  pops  | `a` `b`     | `[a + b] <- [sp]`, `sp++`  |
 |        |        |             |                            |
-| `0x1D` | memset | `a` `b` `c` | `memset(addr=a val=b s=c)` |
-| `0x1E` | memmov | `a` `b` `c` | `memmov(dest=a src=b s=c)` |
+| `0x1E` | memset | `a` `b` `c` | `memset(addr=a val=b s=c)` |
+| `0x1F` | memmov | `a` `b` `c` | `memmov(dest=a src=b s=c)` |
 |        |        |             |                            |
 | `0xFF` |  hlt   |             | halt the computer          |
 

@@ -463,19 +463,20 @@ char *opcode_to_string(uint8_t opcode) {
         case 0x0F: return "and";
         case 0x10: return "band";
         case 0x11: return "bor";
-        case 0x12: return "bnot";
-        case 0x13: return "bshl";
-        case 0x14: return "bshr";
-        case 0x15: return "jmp";
-        case 0x16: return "jmpr";
-        case 0x17: return "out";
-        case 0x18: return "in";
-        case 0x19: return "sup";
-        case 0x1A: return "ssp";
-        case 0x1B: return "load";
-        case 0x1C: return "pops";
-        case 0x1D: return "memset";
-        case 0x1E: return "memmov";
+        case 0x12: return "bxor";
+        case 0x13: return "bnot";
+        case 0x14: return "bshl";
+        case 0x15: return "bshr";
+        case 0x16: return "jmp";
+        case 0x17: return "jmpr";
+        case 0x18: return "out";
+        case 0x19: return "in";
+        case 0x1A: return "sup";
+        case 0x1B: return "ssp";
+        case 0x1C: return "load";
+        case 0x1D: return "pops";
+        case 0x1E: return "memset";
+        case 0x1F: return "memmov";
         case 0xFF: return "halt";
         default:
             fprintf(stderr, "Error: Unknown opcode 0x%02X\n", opcode);
@@ -680,56 +681,60 @@ void execute_program() {
                 WVAL(xmem[pc], source0, RVAL(source0, xmem[pc]) | RVAL(source1, xmem[pc + 1]));
                 pc += 2;
                 break;
-            case 0x12: // bnot
+            case 0x12: // bxor
+                WVAL(xmem[pc], source0, RVAL(source0, xmem[pc]) ^ RVAL(source1, xmem[pc + 1]));
+                pc += 2;
+                break;
+            case 0x13: // bnot
                 WVAL(xmem[pc], source0, ~RVAL(source0, xmem[pc]));
                 pc++;
                 break;
-            case 0x13: // bshl
+            case 0x14: // bshl
                 WVAL(xmem[pc], source0, RVAL(source0, xmem[pc]) << RVAL(source1, xmem[pc + 1]));
                 pc += 2;
                 break;
-            case 0x14: // bshr
+            case 0x15: // bshr
                 WVAL(xmem[pc], source0, RVAL(source0, xmem[pc]) >> RVAL(source1, xmem[pc + 1]));
                 pc += 2;
                 break;
-            case 0x15: // jmp
+            case 0x16: // jmp
                 if (RVAL(source1, xmem[pc + 1]) == 0)
                     pc = RVAL(source0, xmem[pc]);
                 else
                     pc += 2;
                 break;
-            case 0x16: // jmpr
+            case 0x17: // jmpr
                 if (RVAL(source1, xmem[pc + 1]) == 0)
                     pc += RVAL(source0, xmem[pc]);
                 else
                     pc += 2;
                 break;
-            case 0x17: // out
+            case 0x18: // out
                 port_out(RVAL(source0, xmem[pc]), RVAL(source1, xmem[pc + 1]));
                 pc += 2;
                 break;
-            case 0x18: // in
+            case 0x19: // in
                 WVAL(xmem[pc], source0, port_in(RVAL(source1, xmem[pc + 1])));
                 pc += 2;
                 break;
-            case 0x19: // ssp
+            case 0x1A: // ssp
                 sp = RVAL(source0, xmem[pc]);
                 pc++;
                 break;
-            case 0x1A: // sup
+            case 0x1B: // sup
                 up = RVAL(source0, xmem[pc]);
                 pc++;
                 break;
-            case 0x1B: // load
+            case 0x1C: // load
                 WVAL(xmem[pc], source0, rwmem[(uint16_t)(RVAL(source0, xmem[pc]) + RVAL(source1, xmem[pc + 1]))]);
                 pc += 2;
                 break;
-            case 0x1C: // pops
+            case 0x1D: // pops
                 rwmem[(uint16_t)(RVAL(source0, xmem[pc]) + RVAL(source1, xmem[pc + 1]))] = rwmem[rwmem[sp]];
                 rwmem[sp]++;
                 pc += 2;
                 break;
-            case 0x1D: // memset
+            case 0x1E: // memset
             {
                 uint16_t addr = RVAL(source0, xmem[pc]);
                 uint16_t val  = RVAL(source1, xmem[pc + 1]);
@@ -742,7 +747,7 @@ void execute_program() {
                 pc += 3;
                 break;
             }
-            case 0x1E: // memmov
+            case 0x1F: // memmov
             {
                 uint16_t dest = RVAL(source0, xmem[pc]);
                 uint16_t src  = RVAL(source1, xmem[pc + 1]);
