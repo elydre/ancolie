@@ -172,8 +172,9 @@ OPCODES = [
     opcode("sup",    0x1B, 1),
     opcode("load",   0x1C, 2),
     opcode("pops",   0x1D, 2),
-    opcode("memset", 0x1E, 3),
-    opcode("memmov", 0x1F, 3),
+    opcode("mss",    0x1E, 4),
+    opcode("memset", 0x20, 3),
+    opcode("memmov", 0x21, 3),
     opcode("hlt",    0xFF, 0),
 ]
 

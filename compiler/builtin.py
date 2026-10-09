@@ -97,13 +97,16 @@ def blt_in(args: list, dest):
     output.atend(op.calculate_expr(args[0]))
 
     if isinstance(dest, tuple):
+        print("dest is tuple")
         output.add("in", dest, (2, 0))
         output.add("pop", (1, 0))
 
     elif dest == "push":
-        output.add("in", (0, defs.STACK_PTR), (2, 0))
+        print("dest is push")
+        output.add("in", (2, 0), (2, 0))
 
     else:
+        print("dest is unknown")
         output.add("in", (1, 0), (2, 0)) # ignore the return value
         output.add("pop", (1, 0))
 

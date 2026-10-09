@@ -3,7 +3,7 @@ import compiler.defs as defs
 LLC_VERSION = "1.3"
 
 MAGIC_NUMBER = 0xF057
-ARCH_VERSION = 0x0110
+ARCH_VERSION = 0x0120
 
 MAX_CASE_VAL = 127
 

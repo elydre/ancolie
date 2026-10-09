@@ -110,7 +110,7 @@ class opti_pattern:
 
         return output.instructions
 
-ops = "sub|add|mul|div|mod|eq|neq|lt|gt|lte|gte|and|band|bor|bshl|bshr"
+ops = "sub|add|mul|div|mod|eq|neq|lt|gt|lte|gte|and|band|bor|bxor|bshl|bshr"
 
 patterns = [
     opti_pattern(
@@ -243,6 +243,20 @@ patterns = [
         ],
         [
             ("load", "$1", "$2")
+        ]
+    ),
+    opti_pattern(
+        "[a + b] = [a + c]",
+        [
+            ("push", "$1"),
+            ("add", (2, 0), "$2"),
+            ("push", "$3"),
+            ("load", (2, 0), "$4"),
+            ("pops", (2, 1), (1, 0)),
+            ("pop", (1, 0))
+        ],
+        [
+            ("mss", "$1", "$2", "$3", "$4")
         ]
     )
 ]

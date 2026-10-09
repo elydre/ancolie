@@ -16,7 +16,7 @@
 
 // binary file format
 #define MAGIC_NUMBER 0xF057
-#define ARCH_VERSION 0x0110
+#define ARCH_VERSION 0x0120
 #define MAX_SECTIONS 16
 
 #define SECTION_TYPE_CODE 0
@@ -475,8 +475,9 @@ char *opcode_to_string(uint8_t opcode) {
         case 0x1B: return "ssp";
         case 0x1C: return "load";
         case 0x1D: return "pops";
-        case 0x1E: return "memset";
-        case 0x1F: return "memmov";
+        case 0x1E: return "mss";
+        case 0x20: return "memset";
+        case 0x21: return "memmov";
         case 0xFF: return "halt";
         default:
             fprintf(stderr, "Error: Unknown opcode 0x%02X\n", opcode);
@@ -603,7 +604,7 @@ void execute_program() {
         uint8_t source0 = instruction >> 14 & 0x03;
         uint8_t source1 = instruction >> 12 & 0x03;
         uint8_t source2 = instruction >> 10 & 0x03;
-        // uint8_t source3 = instruction >> 8 & 0x03;
+        uint8_t source3 = instruction >> 8 & 0x03;
 
         DEBUGF("pc: %04X \033[34m%s\033[0m\n", pc - 1, opcode_to_string(opcode));
 
@@ -734,7 +735,17 @@ void execute_program() {
                 rwmem[sp]++;
                 pc += 2;
                 break;
-            case 0x1E: // memset
+            case 0x1E: // mss
+            {
+                uint16_t dest = RVAL(source0, xmem[pc])     + RVAL(source1, xmem[pc + 1]);
+                uint16_t src  = RVAL(source2, xmem[pc + 2]) + RVAL(source3, xmem[pc + 3]);
+
+                DEBUGF("mss: [%04X] = [%04X] = %04X\n", dest, src, rwmem[src]);
+                rwmem[dest] = rwmem[src];
+                pc += 4;
+                break;
+            }
+            case 0x20: // memset
             {
                 uint16_t addr = RVAL(source0, xmem[pc]);
                 uint16_t val  = RVAL(source1, xmem[pc + 1]);
@@ -747,7 +758,7 @@ void execute_program() {
                 pc += 3;
                 break;
             }
-            case 0x1F: // memmov
+            case 0x21: // memmov
             {
                 uint16_t dest = RVAL(source0, xmem[pc]);
                 uint16_t src  = RVAL(source1, xmem[pc + 1]);
