@@ -75,6 +75,7 @@ func malloc(size) {
             [addr++] = MALLOC_MAGIC
             [addr++] = size
             malloc_data.malloc_count = malloc_data.malloc_count + 1
+            dump(6543)
             dump(addr)
             return addr
         }

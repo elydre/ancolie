@@ -48,6 +48,17 @@ func strlen(str) {
     return len
 }
 
+func strcmp([str1], [str2]) {
+    : i
+
+    i = 0
+    while [str1 + i] && [str1 + i] == [str2 + i] {
+        i++
+    }
+
+    return [str1 + i] - [str2 + i]
+}
+
 // func strsplit_count(buffer, delimiter) {
 //     : arg_count
 // 

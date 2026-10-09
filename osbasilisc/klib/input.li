@@ -34,8 +34,10 @@ func input(buffer, size) {
                     putchar(chr)
                 } else {
                     // insert character in the middle of the buffer
-                    for i (cursor, buffer_i) {
-                        [buffer + i + 1] = [buffer + i]
+                    i = buffer_i
+                    while i > cursor {
+                        [buffer + i] = [buffer + i - 1]
+                        i--
                     }
                     [buffer + cursor] = chr
                     screen_x = debut_x
