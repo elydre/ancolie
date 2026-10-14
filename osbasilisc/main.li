@@ -53,6 +53,7 @@
 #define WORD_INST_WMEM  46
 #define WORD_INST_CLEAR 47
 #define WORD_INST_DEBUG 48
+#define WORD_INST_CAT   49
 
 #define VAARG           10 // max arguments in vafuncs
 
@@ -114,7 +115,7 @@ $ [g_var_tail] = NULL // var_s
 $ [[g_instructions]]
 $ g_debug = 0
 
-#define INSTRCTIONS_COUNT 44
+#define INSTRCTIONS_COUNT 45
 
 #define WORD_NONE 0
 #define WORD_VAR  1
@@ -149,6 +150,7 @@ g_instructions = array(
     WORD_INST_INT,   "INT",   1,     WORD_NUM,  FMT_ARG1(WORD_STR),
     WORD_INST_LEN,   "LEN",   1,     WORD_NUM,  FMT_ARG1(WORD_STR),
     WORD_INST_LET,   "LET",   2,     WORD_NONE, FMT_ARG2(WORD_VAR, WORD_ALL),
+    WORD_INST_CAT,   "CAT",   2,     WORD_STR,  FMT_ARG2(WORD_STR, WORD_STR),
     WORD_INST_INC,   "INC",   1,     WORD_NONE, FMT_ARG1(WORD_NUM),
     WORD_INST_DEC,   "DEC",   1,     WORD_NONE, FMT_ARG1(WORD_NUM),
     WORD_INST_GOTO,  "GOTO",  1,     WORD_NONE, FMT_ARG1(WORD_NUM),
@@ -1057,6 +1059,23 @@ func execute_word([word], [return_value]) {
         case WORD_INST_STR {
             say_error("ni\n")
             retcode = EXEC_ERROR
+        }
+
+        case WORD_INST_CAT {
+            : len1 = strlen(word_s[args].value)
+            : len2 = strlen(word_s[args + sizeof(word_s)].value)
+            : str = malloc(len1 + len2 + 1)
+            : j
+            for i (0, len1) {
+                [str + i] = [word_s[args].value + i]
+            }
+            for j (0, len2) {
+                [str + i + j] = [word_s[args + sizeof(word_s)].value + j]
+            }
+            [str + i + j] = '\0'
+
+            word_s[return_value].type  = WORD_FSTR
+            word_s[return_value].value = str
         }
 
         case WORD_INST_INT {
