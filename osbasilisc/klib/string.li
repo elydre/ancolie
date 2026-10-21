@@ -25,18 +25,6 @@ func strneqcase([str1], str1len, [str2]) { // str2 is null-terminated
     return 1
 }
 
-func atoi([str]) {
-    : result = 0
-    : i = 0
-
-    while ([str + i] >= '0' && [str + i] <= '9') {
-        result = result * 10 + ([str + i] - '0')
-        i++
-    }
-
-    return result
-}
-
 func strlen(str) {
     : len
 

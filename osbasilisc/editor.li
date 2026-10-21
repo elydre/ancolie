@@ -69,13 +69,16 @@ func program_edit() {
             out(0x1031, 1)
             continue
         }
+
         if type == 2 || type == 4 {
             in(0x1011)
             continue
         }
 
         key = in(0x1011)
-        
+
+        dump(key)
+
         if (type == 1) {
             if (key >= 32 && key <= 126 && length < STRPROG_SIZE - 1) {
                 memmov(program + cursor + 1, program + cursor, length - cursor)
@@ -84,7 +87,7 @@ func program_edit() {
                 length++
                 [program + length] = 0
             }
-        } elif key == 27 {
+        } elif key == BASILISC_EXIT_KEY {
             [program + length] = 0
             screen_clear()
             return length
