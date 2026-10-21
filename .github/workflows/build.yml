@@ -18,8 +18,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y python3
+          sudo apt update
+          sudo apt install -y python3
 
       - name: Compile
         run: python llc.py osbasilisc/main.li -o basilisc.bin
