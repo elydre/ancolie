@@ -75,7 +75,7 @@ typedef struct {
     SDL_Texture *texture;
     font_data_t *font;
 
-    uint64_t sleep_ticks;
+    uint64_t sleep_to;
     int cursor_pos;
 
     keyboard_event_t kbbuf[256];
@@ -328,36 +328,33 @@ static uint16_t decode_utf8_character(const char **text) {
 void gui_loop(uint64_t ips, uint64_t delta_time) {
     SDL_Event event;
 
+    static int have_ctrl = 0;
+
     while (SDL_PollEvent(&event)) {
         if (event.type == SDL_QUIT) {
             cleanup_gui();
             exit(0);
         } else if (event.type == SDL_KEYDOWN || event.type == SDL_KEYUP) {
-            int is_modifier = event.key.keysym.scancode == SDL_SCANCODE_LSHIFT ||
-                              event.key.keysym.scancode == SDL_SCANCODE_RSHIFT ||
-                              event.key.keysym.scancode == SDL_SCANCODE_LCTRL  ||
-                              event.key.keysym.scancode == SDL_SCANCODE_RCTRL  ||
-                              event.key.keysym.scancode == SDL_SCANCODE_LALT   ||
-                              event.key.keysym.scancode == SDL_SCANCODE_RALT;
-            int is_control = event.key.keysym.sym < 32 ||
-                             event.key.keysym.sym == 127 ||
-                             event.key.keysym.sym >= SDLK_SCANCODE_MASK;
-
-            if (is_modifier || (event.type == SDL_KEYDOWN && !is_control))
-                continue;
-
             keyboard_event_t kevent;
             kevent.type = (event.type == SDL_KEYDOWN) ? 3 : 4;
-            kevent.value = event.key.keysym.sym;
+            kevent.value = (event.key.keysym.sym & 0x7FFFF) | ((have_ctrl ? 1 : 0) << 15);
 
             if (gui.kbbuf_size < (int)(sizeof(gui.kbbuf) / sizeof(keyboard_event_t))) {
                 gui.kbbuf[gui.kbbuf_size++] = kevent;
+            }
+
+            if (event.key.keysym.scancode == SDL_SCANCODE_LCTRL || event.key.keysym.scancode == SDL_SCANCODE_RCTRL) {
+                have_ctrl = (event.type == SDL_KEYDOWN);
             }
         } else if (event.type == SDL_TEXTINPUT) {
             const char *text = event.text.text;
 
             while (*text != '\0' && gui.kbbuf_size < (int)(sizeof(gui.kbbuf) / sizeof(keyboard_event_t))) {
-                keyboard_event_t kevent = { .type = 1, .value = decode_utf8_character(&text) };
+                unsigned value = decode_utf8_character(&text);
+                if (value > 0xFF) {
+                    continue; // skip characters that cannot be represented in 8 bits
+                }
+                keyboard_event_t kevent = { .type = 1, .value = value };
                 gui.kbbuf[gui.kbbuf_size++] = kevent;
             }
         }
@@ -573,7 +570,10 @@ void port_out(uint16_t port, uint16_t value) {
         case 0x1031:
             #ifdef GUI
             if (use_gui) {
-                gui.sleep_ticks = SDL_GetTicks() + value * 50; // minecraft tick
+                if (value != 1) {
+                    printf("Sleeping for %d ticks\n", value);
+                }
+                gui.sleep_to = SDL_GetTicks() + value * 50; // minecraft tick
             } else {
             #endif
                 usleep(value * 50000); // minecraft tick
@@ -793,17 +793,17 @@ void execute_program() {
             uint64_t current_time;
             icount++;
 
-            while (gui.sleep_ticks > 0) {
+            while (gui.sleep_to > 0) {
                 current_time = SDL_GetTicks();
 
-                int to_sleep = min((int)(gui.sleep_ticks - current_time), (int)(current_time - last_time));
+                int to_sleep = min((int)(gui.sleep_to - current_time), (int)(current_time - last_time));
                 last_time = current_time;
 
-                if (to_sleep > 0) {
+                if (to_sleep >= 0) {
                     gui_loop(0, 0);
                     usleep(to_sleep * 1000);
                 } else {
-                    gui.sleep_ticks = 0;
+                    gui.sleep_to = 0;
                 }
             }
 
