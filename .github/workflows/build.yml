@@ -22,14 +22,8 @@ jobs:
           sudo apt-get install -y python3
 
       - name: Compile
-        run: python llc.py -a osbasilisc/main.li -o basilisc.bin
+        run: python llc.py osbasilisc/main.li -o basilisc.bin
 
-      - name: Upload executable
-        uses: actions/upload-artifact@v4
-        with:
-          name: basilisc.bin
-          path: basilisc.bin
-      
       - name: Upload executable to GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
