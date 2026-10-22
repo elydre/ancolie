@@ -1183,6 +1183,8 @@ func execute_word([word], [return_value]) {
 
             : [input_str] = malloc(64)
             input(input_str, 64)
+            putchar('\n')
+            screen_flush()
 
             word_s[return_value].type  = WORD_FSTR
             word_s[return_value].value = input_str
@@ -1433,12 +1435,16 @@ func shell_iter() {
         }
 
         if (end == 0) {
-            screen_y--
+            if (line_count == 0) {
+                screen_x = 2
+                continue
+            }
             screen_x = 1
             putchar('\b')
-            screen_flush()
             break
         }
+
+        putchar('\n')
 
         strline = strline + check_goto_label(strline, &end, line_count)
         if (end == 0) {
@@ -1456,6 +1462,8 @@ func shell_iter() {
         }
         print("> ")
     }
+
+    screen_flush()
 
     for i (0, line_count) {
         if (g_debug) {

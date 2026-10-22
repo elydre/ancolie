@@ -75,8 +75,6 @@ func malloc(size) {
             [addr++] = MALLOC_MAGIC
             [addr++] = size
             malloc_data.malloc_count = malloc_data.malloc_count + 1
-            dump(6543)
-            dump(addr)
             return addr
         }
     }
@@ -90,12 +88,10 @@ func free(addr) {
     : debut_index
     : size i j
 
-    dump(666)
-    dump(addr)
-
     if (addr == 0) {
         return
     }
+
     addr = addr - 2
 
     if (addr < malloc_data.debut + malloc_data.index_size || addr >= malloc_data.debut + malloc_data.index_size + malloc_data.size) {

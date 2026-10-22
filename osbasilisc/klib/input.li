@@ -113,8 +113,6 @@ func input(buffer, size) {
         }
 
         if chr == '\r' {
-            putchar('\n')
-            screen_flush()
             [buffer + buffer_i] = 0
             return buffer_i
         }

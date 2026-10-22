@@ -14,15 +14,11 @@ func screen_clear() {
 }
 
 func putchar(c) {
-    if c == '\n' {
-        screen_x = 0
-        screen_y++
-        return
-    }
     if c == '\r' {
         screen_x = 0
         return
     }
+    
     if c == '\b' {
         if screen_x > 0 {
             screen_x--
@@ -30,17 +26,27 @@ func putchar(c) {
         [_lSCREEN + (80 * screen_y + screen_x)] = ' '
         return
     }
-    if screen_x > 79 {
+
+    if c == '\n' {
         screen_x = 0
         screen_y++
     }
+
+    else {
+        [_lSCREEN + (80 * screen_y) + screen_x] = c |b screen_color
+        screen_x++
+
+        if screen_x > 79 {
+            screen_x = 0
+            screen_y++
+        }
+    }
+
     if screen_y > 24 {
         memmov(_lSCREEN, _lSCREEN + 80, 80 * 24)
         memset(_lSCREEN + (80 * 24), ' ', 80)
         screen_y = 24
     }
-    [_lSCREEN + (80 * screen_y) + screen_x] = c |b screen_color
-    screen_x++
 }
 
 func putnbr(n) {
