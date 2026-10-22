@@ -169,7 +169,7 @@ void rwmem_to_screen(void) {
 
     for (uint32_t y = 0; y < gui.font->height; y++) {
         for (int x = 1; x < 3; x++) {
-            gui.fb[(cursor_x * gui.font->width + x) + (cursor_y * gui.font->height + y) * (gui.pitch / 4)] ^= 0xAAAAAAAA;
+            gui.fb[(cursor_x * gui.font->width + x) + (cursor_y * gui.font->height + y) * (gui.pitch / 4)] = 0xAAAAAAFF;
         }
     }
 }
@@ -570,9 +570,6 @@ void port_out(uint16_t port, uint16_t value) {
         case 0x1031:
             #ifdef GUI
             if (use_gui) {
-                if (value != 1) {
-                    printf("Sleeping for %d ticks\n", value);
-                }
                 gui.sleep_to = SDL_GetTicks() + value * 50; // minecraft tick
             } else {
             #endif
