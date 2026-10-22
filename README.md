@@ -2,7 +2,7 @@
 
 This repository contains:
 
-- **cream**: a 16-bit instruction set, initially designed for a Minecraft mod.
+- **cream**: a 16-bit instruction set, initially designed for the Minecraft mod [cream](https://github.com/elydre/cream).
 - **ancolie**: a typeless 16-bit C-like programming language.
 - **llc**: a compiler that translates Ancolie programs into Cream instructions.
 - **basilisc**: an operating system and programming language written in Ancolie. It's inspired by 1980s computers such as the Commodore 64.
