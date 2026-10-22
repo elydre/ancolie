@@ -867,7 +867,7 @@ func execute_word([word], [return_value]) {
                         printf("[type: %d]", word_s[args + i].type)
                     }
                 }
-                if (i / sizeof(word_s) < argc - 1) {
+                if (word_s[word].type == WORD_INST_PRINT && i / sizeof(word_s) < argc - 1) {
                     putchar(' ')
                 }
             }
