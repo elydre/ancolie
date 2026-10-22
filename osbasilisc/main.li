@@ -1,4 +1,4 @@
-#define BASILISC_VERSION "0.5"
+#define BASILISC_VERSION "0.5b"
 
 // setings
 #define BASILISC_EXIT_KEY 0x8009 // ctrl + tab
@@ -9,10 +9,10 @@
 #define WORD_NUM  2
 #define WORD_STR  3
 #define WORD_FSTR 4
+#define WORD_ANY  5 // use by type checking to allow any type
 
-#define WORD_FIRST_INST 5
+#define WORD_FIRST_INST 6
 
-#define WORD_INST_PRINT 5
 #define WORD_INST_WRITE 6
 #define WORD_INST_GOTO  7
 #define WORD_INST_IF    8
@@ -58,6 +58,7 @@
 #define WORD_INST_DEBUG 48
 #define WORD_INST_CAT   49
 #define WORD_INST_SLEEP 50
+#define WORD_INST_PRINT 51
 
 #define VAARG           10 // max arguments in vafuncs
 
@@ -127,7 +128,6 @@ $ g_debug = 0
 #define WORD_STR  3
 #define WORD_FSTR 4
 
-#define WORD_ALL 0xF
 #define FMT_ARG1(a1) (a1 << 12)
 #define FMT_ARG2(a1, a2) (a1 << 12 |b a2 << 8)
 #define FMT_ARG3(a1, a2, a3) (a1 << 12 |b a2 << 8 |b a3 << 4)
@@ -141,10 +141,10 @@ g_instructions = array(
     WORD_INST_MOD,   "%",     2,     WORD_NUM,  FMT_ARG2(WORD_NUM, WORD_NUM),
     WORD_INST_LT,    "<",     2,     WORD_NUM,  FMT_ARG2(WORD_NUM, WORD_NUM),
     WORD_INST_GT,    ">",     2,     WORD_NUM,  FMT_ARG2(WORD_NUM, WORD_NUM),
-    WORD_INST_EQ,    "==",    2,     WORD_NUM,  FMT_ARG2(WORD_ALL, WORD_ALL),
-    WORD_INST_NEQ,   "!=",    2,     WORD_NUM,  FMT_ARG2(WORD_ALL, WORD_ALL),
-    WORD_INST_AND,   "AND",   2,     WORD_NUM,  FMT_ARG2(WORD_ALL, WORD_ALL),
-    WORD_INST_OR,    "OR",    2,     WORD_NUM,  FMT_ARG2(WORD_ALL, WORD_ALL),
+    WORD_INST_EQ,    "==",    2,     WORD_NUM,  FMT_ARG2(WORD_ANY, WORD_ANY),
+    WORD_INST_NEQ,   "!=",    2,     WORD_NUM,  FMT_ARG2(WORD_ANY, WORD_ANY),
+    WORD_INST_AND,   "AND",   2,     WORD_NUM,  FMT_ARG2(WORD_ANY, WORD_ANY),
+    WORD_INST_OR,    "OR",    2,     WORD_NUM,  FMT_ARG2(WORD_ANY, WORD_ANY),
     WORD_INST_BSHL,  "<<",    2,     WORD_NUM,  FMT_ARG2(WORD_NUM, WORD_NUM),
     WORD_INST_BSHR,  ">>",    2,     WORD_NUM,  FMT_ARG2(WORD_NUM, WORD_NUM),
     WORD_INST_BAND,  "&",     2,     WORD_NUM,  FMT_ARG2(WORD_NUM, WORD_NUM),
@@ -153,15 +153,15 @@ g_instructions = array(
     WORD_INST_STR,   "STR",   1,     WORD_STR,  FMT_ARG1(WORD_NUM),
     WORD_INST_INT,   "INT",   1,     WORD_NUM,  FMT_ARG1(WORD_STR),
     WORD_INST_LEN,   "LEN",   1,     WORD_NUM,  FMT_ARG1(WORD_STR),
-    WORD_INST_LET,   "LET",   2,     WORD_NONE, FMT_ARG2(WORD_VAR, WORD_ALL),
+    WORD_INST_LET,   "LET",   2,     WORD_NONE, FMT_ARG2(WORD_VAR, WORD_ANY),
     WORD_INST_CAT,   "CAT",   2,     WORD_STR,  FMT_ARG2(WORD_STR, WORD_STR),
     WORD_INST_INC,   "INC",   1,     WORD_NONE, FMT_ARG1(WORD_NUM),
     WORD_INST_DEC,   "DEC",   1,     WORD_NONE, FMT_ARG1(WORD_NUM),
     WORD_INST_GOTO,  "GOTO",  1,     WORD_NONE, FMT_ARG1(WORD_NUM),
-    WORD_INST_IF,    "IF",    2,     WORD_NONE, FMT_ARG2(WORD_NUM, WORD_ALL),
+    WORD_INST_IF,    "IF",    2,     WORD_NONE, FMT_ARG2(WORD_NUM, WORD_ANY),
     WORD_INST_THEN,  "THEN",  VAARG, WORD_NONE, FMT_NOTP,
     WORD_INST_ELSE,  "ELSE",  VAARG, WORD_NONE, FMT_NOTP,
-    WORD_INST_WHILE, "WHILE", 2,     WORD_NONE, FMT_ARG2(WORD_NUM, WORD_ALL),
+    WORD_INST_WHILE, "WHILE", 2,     WORD_NONE, FMT_ARG2(WORD_NUM, WORD_ANY),
     WORD_INST_PRINT, "PRINT", VAARG, WORD_NONE, FMT_NOTP,
     WORD_INST_WRITE, "WRITE", VAARG, WORD_NONE, FMT_NOTP,
     WORD_INST_INPUT, "INPUT", 1,     WORD_STR,  FMT_ARG1(WORD_STR),
@@ -177,7 +177,7 @@ g_instructions = array(
     WORD_INST_ED,    "ED",    0,     WORD_NONE, FMT_NOTP,
     WORD_INST_RUN,   "RUN",   0,     WORD_NONE, FMT_NOTP,
     WORD_INST_NEW,   "NEW",   0,     WORD_NONE, FMT_NOTP,
-    WORD_INST_HELP,  "HELP",  0,     WORD_NONE, FMT_NOTP,
+    WORD_INST_HELP,  "HELP",  VAARG, WORD_NONE, FMT_NOTP,
     WORD_INST_SSTAT, "SSTAT", 0,     WORD_NONE, FMT_NOTP,
     WORD_INST_DEBUG, "DEBUG", 1,     WORD_NONE, FMT_ARG1(WORD_NUM)
 )
@@ -365,6 +365,9 @@ func get_word_name(type) {
         }
         case WORD_FSTR {
             return "fstring"
+        }
+        case WORD_ANY {
+            return "any"
         }
     }
 
@@ -752,7 +755,7 @@ func check_types([word]) {
 
     for i (0, argc) {
         : expected = (inst_s[inst].arg_types >> (12 - i * 4)) &b 0xF
-        if (expected == WORD_ALL) {
+        if (expected == WORD_ANY) {
             // printf("skipping argument %d of '%s', any type is allowed\n", i + 1, get_word_name(word_s[word].type))
             continue
         }
@@ -902,7 +905,7 @@ func execute_word([word], [return_value]) {
                     var_s[word_s[args].value].value = word_s[args + sizeof(word_s)].value
                 }
                 default {
-                    say_error("'LET' expects a string or number as second argument\n")
+                    say_error("'LET' expects a string or number as second argument, got %s\n", get_word_name(word_s[args + sizeof(word_s)].type))
                     var_s[word_s[args].value].type  = VAR_NUM
                     var_s[word_s[args].value].value = 0
                     retcode = EXEC_ERROR
@@ -997,49 +1000,57 @@ func execute_word([word], [return_value]) {
         }
 
         case WORD_INST_AND {
-            word_s[return_value].type = WORD_NUM
             : b
             if (word_s[args].type == WORD_NUM) {
                 a = word_s[args].value
+            } elif (word_s[args].type == WORD_NONE) {
+                a = 0
             } elif (is_str_arg(args)) {
                 a = [word_s[args].value] != 0
             } else {
-                say_error("'AND' expects number or string arguments\n")
+                say_error("'AND' receives an unknown argument type: %s\n", get_word_name(word_s[args].type))
                 retcode = EXEC_ERROR
                 break
             }
             if (word_s[args + sizeof(word_s)].type == WORD_NUM) {
                 b = word_s[args + sizeof(word_s)].value
+            } elif (word_s[args + sizeof(word_s)].type == WORD_NONE) {
+                b = 0
             } elif (is_str_arg(args + sizeof(word_s))) {
                 b = [word_s[args + sizeof(word_s)].value] != 0
             } else {
-                say_error("'AND' expects number or string arguments\n")
+                say_error("'AND' receives an unknown argument type: %s\n", get_word_name(word_s[args + sizeof(word_s)].type))
                 retcode = EXEC_ERROR
                 break
             }
+            word_s[return_value].type = WORD_NUM
             word_s[return_value].value = a && b
         }
 
         case WORD_INST_OR {
-            word_s[return_value].type = WORD_NUM
             if (word_s[args].type == WORD_NUM) {
                 a = word_s[args].value
+            } elif (word_s[args].type == WORD_NONE) {
+                a = 0
             } elif (is_str_arg(args)) {
                 a = [word_s[args].value] != 0
             } else {
-                say_error("'OR' expects number or string arguments\n")
+                say_error("'OR' receives an unknown argument type: %s\n", get_word_name(word_s[args].type))
                 retcode = EXEC_ERROR
                 break
             }
             if (word_s[args + sizeof(word_s)].type == WORD_NUM) {
                 b = word_s[args + sizeof(word_s)].value
+            } elif (word_s[args + sizeof(word_s)].type == WORD_NONE) {
+                b = 0
             } elif (is_str_arg(args + sizeof(word_s))) {
                 b = [word_s[args + sizeof(word_s)].value] != 0
             } else {
-                say_error("'OR' expects number or string arguments\n")
+                say_error("'OR' receives an unknown argument type: %s\n", get_word_name(word_s[args + sizeof(word_s)].type))
                 retcode = EXEC_ERROR
                 break
             }
+            word_s[return_value].type = WORD_NUM
             word_s[return_value].value = a || b
         }
 
@@ -1213,28 +1224,69 @@ func execute_word([word], [return_value]) {
         }
 
         case WORD_INST_HELP {
-            printf("$02GENERAL OPERATION -$07\n")
-            print("  The current interface is an interactive shell,\n")
-            print("  you can write code and execute it by pressing Enter twice.\n")
-            printf("  Use $0FED$07 to write longer programs, then exit by pressing CTRL+TAB.\n")
-            printf("  You can then execute the program using $0FRUN$07.\n")
-            printf("  Defined variables remain accessible; to clear them, use $0FNEW$07.\n")
-            printf("$02BASILISC LANGUAGE -$07\n")
-            printf("  $07Variable assignment     $0Fname = 123\n")
-            printf("  $07Instruction call        $0FinstA argA1 (instB (instC argC1) argB2) argA3\n")
-            printf("  $07Create a label          $0F[0]\n")
-            printf("  $07Jump to label           $0FGOTO 0\n")
-            printf("  $07Conditional structure   $0FIF (something) (do_something)\n")
-            printf("$02AVAILABLE INSTRUCTIONS -$0F\n")
-            for i (0, INSTRCTIONS_COUNT * sizeof(inst_s), sizeof(inst_s)) {
-                printf("  %s", inst_s[g_instructions + i].name)
-                screen_x = screen_x + (10 - screen_x % 10)
-                if (screen_x > 60) {
-                    putchar('\n')
+            if (argc == 0) {
+                printf("$02GENERAL OPERATION -$07\n")
+                print("  The current interface is an interactive shell,\n")
+                print("  you can write code and execute it by pressing Enter twice.\n")
+                printf("  Use $0FED$07 to write longer programs, then exit by pressing CTRL+TAB.\n")
+                printf("  You can then execute the program using $0FRUN$07.\n")
+                printf("  Defined variables remain accessible; to clear them, use $0FNEW$07.\n")
+                printf("$02BASILISC LANGUAGE -$07\n")
+                printf("  $07Variable assignment     $0Fname = 123\n")
+                printf("  $07Instruction call        $0FinstA argA1 (instB (instC argC1) argB2) argA3\n")
+                printf("  $07Create a label          $0F[0]\n")
+                printf("  $07Jump to label           $0FGOTO 0\n")
+                printf("  $07Conditional structure   $0FIF (something) (do_something)\n")
+                printf("  $07Specific information    $0FHELP \"inst\"\n")
+                printf("$02AVAILABLE INSTRUCTIONS -$0F\n")
+                for i (0, INSTRCTIONS_COUNT * sizeof(inst_s), sizeof(inst_s)) {
+                    printf("  %s", inst_s[g_instructions + i].name)
+                    screen_x = screen_x + (10 - screen_x % 10)
+                    if (screen_x > 60) {
+                        putchar('\n')
+                    }
+                }
+                printf("\n$07More information at: github.com/elydre/ancolie$0F\n")
+                break
+            }
+
+            for i (0, argc * sizeof(word_s), sizeof(word_s)) {
+                if (word_s[args + i].type != WORD_STR && word_s[args + i].type != WORD_FSTR) {
+                    say_error("'HELP' expects string arguments, got %s\n", get_word_name(word_s[args + i].type))
+                    retcode = EXEC_ERROR
+                    break
+                }
+
+                : found = 0
+                for a (0, INSTRCTIONS_COUNT * sizeof(inst_s), sizeof(inst_s)) {
+                    if (!strneqcase(word_s[args + i].value, strlen(word_s[args + i].value), inst_s[g_instructions + a].name)) {
+                        continue
+                    }
+
+                    found = 1
+                    printf("( %s ", inst_s[g_instructions + a].name)
+
+                    if (inst_s[g_instructions + a].argc == VAARG) {
+                        print("... ")
+                    } elif (inst_s[g_instructions + a].argc > 4) {
+                        say_error("too many arguments for type printing\n")
+                        retcode = EXEC_ERROR
+                        break
+                    } else {
+                        for b (0, inst_s[g_instructions + a].argc) {
+                            printf("%s ", get_word_name((inst_s[g_instructions + a].arg_types >> (12 - b * 4)) &b 0xF))
+                        }
+                    }
+
+                    printf(") -> %s\n", get_word_name(inst_s[g_instructions + a].ret_type))
+                    break
+                }
+
+                if (!found) {
+                    say_error("'%s' is not a valid instruction\n", word_s[args + i].value)
+                    retcode = EXEC_ERROR
                 }
             }
-            printf("\n$07More information at: github.com/elydre/ancolie$0F\n")
-            screen_color = 0x0F00
         }
 
         case WORD_INST_SSTAT {
