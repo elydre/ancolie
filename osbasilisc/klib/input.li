@@ -1,6 +1,25 @@
+#define STANDBY_TIMEOUT 300 // 15 seconds
+
 func screen_flush_cursor(y, x) {
     out(0x1021, y * 80 + x)
     out(0x1020, 0)
+}
+
+func entry_standby() {
+    : oldchar = [_lSCREEN + 79]
+    : type = 0
+
+    [_lSCREEN + 79] = 'Z' |b 0x4C00
+    screen_flush()
+
+    while type == 0 {
+        out(0x1031, 20)
+        type = in(0x1010)
+    }
+
+    [_lSCREEN + 79] = oldchar
+
+    return type
 }
 
 func input(buffer, size) {
@@ -11,13 +30,23 @@ func input(buffer, size) {
     : debut_x = screen_x
     : debut_y = screen_y
 
+    : sleep_counter = 0
+
     while 1 {
         type = in(0x1010)
+
         if type == 0 {
             // nothing for now
             out(0x1031, 1)
-            continue
+            sleep_counter++
+            if sleep_counter < STANDBY_TIMEOUT {
+                continue
+            }
+            type = entry_standby()
         }
+
+        sleep_counter = 0
+
         if type == 2 || type == 4 {
             // keyboard release
             in(0x1011) // consume the keycode
@@ -26,10 +55,10 @@ func input(buffer, size) {
 
         chr = in(0x1011)
 
-        if (type == 1) {
+        if type == 1 {
             // text key down
             if buffer_i < size - 1 && (chr >= 32 && chr <= 126) {
-                if (cursor == buffer_i) {
+                if cursor == buffer_i {
                     [buffer + buffer_i] = chr
                     putchar(chr)
                 } else {
@@ -53,7 +82,7 @@ func input(buffer, size) {
             continue
         }
 
-        if (type != 3) {
+        if type != 3 {
             // not a special key down
             continue
         }
