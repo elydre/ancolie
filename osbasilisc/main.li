@@ -1,4 +1,4 @@
-#define BASILISC_VERSION "0.5b"
+#define BASILISC_VERSION "0.6"
 
 // setings
 #define BASILISC_EXIT_KEY 0x8009 // ctrl + tab
@@ -59,6 +59,7 @@
 #define WORD_INST_CAT   49
 #define WORD_INST_SLEEP 50
 #define WORD_INST_PRINT 51
+#define WORD_INST_AT    52
 
 #define VAARG           10 // max arguments in vafuncs
 
@@ -120,7 +121,7 @@ $ [g_var_tail] = NULL // var_s
 $ [[g_instructions]]
 $ g_debug = 0
 
-#define INSTRCTIONS_COUNT 46
+#define INSTRCTIONS_COUNT 47
 
 #define WORD_NONE 0
 #define WORD_VAR  1
@@ -150,13 +151,14 @@ g_instructions = array(
     WORD_INST_BAND,  "&",     2,     WORD_NUM,  FMT_ARG2(WORD_NUM, WORD_NUM),
     WORD_INST_BOR,   "|",     2,     WORD_NUM,  FMT_ARG2(WORD_NUM, WORD_NUM),
     WORD_INST_BXOR,  "^",     2,     WORD_NUM,  FMT_ARG2(WORD_NUM, WORD_NUM),
-    WORD_INST_STR,   "STR",   1,     WORD_STR,  FMT_ARG1(WORD_NUM),
-    WORD_INST_INT,   "INT",   1,     WORD_NUM,  FMT_ARG1(WORD_STR),
-    WORD_INST_LEN,   "LEN",   1,     WORD_NUM,  FMT_ARG1(WORD_STR),
     WORD_INST_LET,   "LET",   2,     WORD_NONE, FMT_ARG2(WORD_VAR, WORD_ANY),
-    WORD_INST_CAT,   "CAT",   2,     WORD_STR,  FMT_ARG2(WORD_STR, WORD_STR),
     WORD_INST_INC,   "INC",   1,     WORD_NONE, FMT_ARG1(WORD_NUM),
     WORD_INST_DEC,   "DEC",   1,     WORD_NONE, FMT_ARG1(WORD_NUM),
+    WORD_INST_INT,   "INT",   1,     WORD_NUM,  FMT_ARG1(WORD_STR),
+    WORD_INST_STR,   "STR",   1,     WORD_STR,  FMT_ARG1(WORD_NUM),
+    WORD_INST_LEN,   "LEN",   1,     WORD_NUM,  FMT_ARG1(WORD_STR),
+    WORD_INST_AT,    "AT",    2,     WORD_STR,  FMT_ARG2(WORD_STR, WORD_NUM),
+    WORD_INST_CAT,   "CAT",   2,     WORD_STR,  FMT_ARG2(WORD_STR, WORD_STR),
     WORD_INST_GOTO,  "GOTO",  1,     WORD_NONE, FMT_ARG1(WORD_NUM),
     WORD_INST_IF,    "IF",    2,     WORD_NONE, FMT_ARG2(WORD_NUM, WORD_ANY),
     WORD_INST_THEN,  "THEN",  VAARG, WORD_NONE, FMT_NOTP,
@@ -327,6 +329,30 @@ func str2int([str], length) {
     }
 
     return result
+}
+
+func int2str(num, [str]) {
+    : i = 0
+    : tmp = num
+
+    if (num == 0) {
+        [str] = '0'
+        [str + 1] = 0
+        return
+    }
+
+    while (tmp > 0) {
+        tmp = tmp / 10
+        i++
+    }
+
+    [str + i] = 0
+
+    while (num > 0) {
+        i--
+        [str + i] = (num % 10) + '0'
+        num = num / 10
+    }
 }
 
 func is_valid_var_name([str], length) {
@@ -816,7 +842,7 @@ func execute_word([word], [return_value]) {
                 return EXEC_ERROR
             }
             if (word_s[word_s[word].value + i].type == WORD_VAR) {
-                if (word_s[word].type == WORD_INST_LET || word_s[word].type == WORD_INST_INC || word_s[word].type == WORD_INST_DEC) {
+                if (i == 0 && word_s[word].type == WORD_INST_LET || word_s[word].type == WORD_INST_INC || word_s[word].type == WORD_INST_DEC) {
                     word_s[args + i].type  = word_s[word_s[word].value + i].type
                     word_s[args + i].value = word_s[word_s[word].value + i].value
                 } else {
@@ -882,6 +908,24 @@ func execute_word([word], [return_value]) {
             word_s[return_value].value = strlen(word_s[args].value)
         }
 
+        case WORD_INST_AT {
+            : index = word_s[args + sizeof(word_s)].value
+            if (index < 0 || index >= strlen(word_s[args].value)) {
+                say_error("index %d is out of bounds for string of length %d\n", index, strlen(word_s[args].value))
+                retcode = EXEC_ERROR
+            } else {
+                word_s[return_value].type  = WORD_FSTR
+                word_s[return_value].value = malloc(2)
+                if (word_s[return_value].value == NULL) {
+                    say_error("out of memory\n")
+                    retcode = EXEC_ERROR
+                } else {
+                    [word_s[return_value].value] = [word_s[args].value + index]
+                    [word_s[return_value].value + 1] = 0
+                }
+            }
+        }
+
         case WORD_INST_STOP {
             retcode = EXEC_END
         }
@@ -906,8 +950,6 @@ func execute_word([word], [return_value]) {
                 }
                 default {
                     say_error("'LET' expects a string or number as second argument, got %s\n", get_word_name(word_s[args + sizeof(word_s)].type))
-                    var_s[word_s[args].value].type  = VAR_NUM
-                    var_s[word_s[args].value].value = 0
                     retcode = EXEC_ERROR
                 }
             }
@@ -1143,14 +1185,26 @@ func execute_word([word], [return_value]) {
         }
 
         case WORD_INST_STR {
-            say_error("ni\n")
-            retcode = EXEC_ERROR
+            word_s[return_value].type  = WORD_FSTR
+            word_s[return_value].value = malloc(6) // len of "65535" + 1
+            if (!word_s[return_value].value) {
+                say_error("out of memory\n")
+                retcode = EXEC_ERROR
+                break
+            }
+            int2str(word_s[args].value, word_s[return_value].value)
         }
 
         case WORD_INST_CAT {
             : len1 = strlen(word_s[args].value)
             : len2 = strlen(word_s[args + sizeof(word_s)].value)
             : str = malloc(len1 + len2 + 1)
+            if (!str) {
+                say_error("out of memory\n")
+                retcode = EXEC_ERROR
+                break
+            }
+
             : j
             for i (0, len1) {
                 [str + i] = [word_s[args].value + i]
@@ -1182,6 +1236,12 @@ func execute_word([word], [return_value]) {
             screen_flush()
 
             : [input_str] = malloc(64)
+            if (!input_str) {
+                say_error("out of memory\n")
+                retcode = EXEC_ERROR
+                break
+            }
+
             input(input_str, 64)
             putchar('\n')
             screen_flush()
@@ -1331,7 +1391,7 @@ func execute_word([word], [return_value]) {
 }
 
 func program_run() {
-    :i
+    : i inst
 
     // count how many lines are in the program
     : [program] = STRPROG_DEBUT
@@ -1353,38 +1413,39 @@ func program_run() {
     while ([program]) {
         : end = line_end(program, strlen(program))
 
+        program = program + check_goto_label(program, &end, line_count)
+
         if (end == 0) {
+            if ([program]) {
+                program++
+                continue
+            }
             break
         }
 
-        program = program + check_goto_label(program, &end, line_count)
-        if (end == 0) {
-            program = program + 1
-            continue
-        }
+        inst = parse_str(program, end, NULL, 1)
 
-        [lines + line_count] = parse_str(program, end, NULL, 1)
-
-        if ([lines + line_count] == NULL) {
+        if (inst == NULL) {
             printf("$09on %S$0F\n", program, end)
             return 1
         }
 
-        line_count++
-        program = program + end + 1
-    }
-
-    for i (0, line_count) {
         if (g_debug) {
-            print_word([lines + i])
+            print_word(inst)
             printf("\n")
         }
-        if (check_types([lines + i]) == EXEC_ERROR) {
+
+        if (check_types(inst) == EXEC_ERROR) {
             printf("$09on ")
-            print_word([lines + i])
+            print_word(inst)
             printf("$0F\n")
             return
         }
+
+        [lines + line_count] = inst
+
+        line_count++
+        program = program + end + 1
     }
 
     printf("$07execution started !$0F\n")
@@ -1413,7 +1474,7 @@ func program_run() {
 }
 
 func shell_iter() {
-    :i
+    : i inst
 
     new_word(INTMAX)
     memset(GOTO_TABLE, 0xFFFF, 100)
@@ -1452,15 +1513,20 @@ func shell_iter() {
             continue
         }
 
-        [lines + line_count] = parse_str(strline, end, NULL, 1)
+        inst = parse_str(strline, end, NULL, 1)
 
-        if ([lines + line_count]) {
-            line_count++
-        } elif line_count == 0 {
-            print("# ")
-            continue
+        if (inst) {
+            if (check_types(inst) != EXEC_ERROR) {
+                [lines + line_count] = inst
+                line_count++
+            }
         }
-        print("> ")
+
+        if (line_count == 0) {
+            print("# ")
+        } else {
+            print("> ")
+        }
     }
 
     screen_flush()
@@ -1469,12 +1535,6 @@ func shell_iter() {
         if (g_debug) {
             print_word([lines + i])
             printf("\n")
-        }
-        if (check_types([lines + i]) == EXEC_ERROR) {
-            printf("$09on ")
-            print_word([lines + i])
-            printf("$0F\n")
-            return
         }
     }
 
@@ -1519,7 +1579,7 @@ printf("$0F           TT          $07and press Enter twice.$0F\n\n" )
 malloc_init(MALLOC_DEBUT, MALLOC_SIZE, 16)
 [STRPROG_DEBUT] = 0
 
-// : prog = "[0]\nif (and (in 1) (in 3)) out 2 15\nelse out 2 0\nsleep 1\ngoto 0"
+// : prog = "[0]\nat \"v\" 0\nsstat\ngoto 0"
 // memmov(STRPROG_DEBUT, prog, strlen(prog))
 
 while (1) {
