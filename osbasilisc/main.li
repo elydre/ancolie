@@ -1,4 +1,4 @@
-#define BASILISC_VERSION "0.6"
+#define BASILISC_VERSION "0.6b"
 
 // setings
 #define BASILISC_EXIT_KEY 0x8009 // ctrl + tab
@@ -152,13 +152,13 @@ g_instructions = array(
     WORD_INST_BOR,   "|",     2,     WORD_NUM,  FMT_ARG2(WORD_NUM, WORD_NUM),
     WORD_INST_BXOR,  "^",     2,     WORD_NUM,  FMT_ARG2(WORD_NUM, WORD_NUM),
     WORD_INST_LET,   "LET",   2,     WORD_NONE, FMT_ARG2(WORD_VAR, WORD_ANY),
-    WORD_INST_INC,   "INC",   1,     WORD_NONE, FMT_ARG1(WORD_NUM),
-    WORD_INST_DEC,   "DEC",   1,     WORD_NONE, FMT_ARG1(WORD_NUM),
+    WORD_INST_INC,   "INC",   1,     WORD_NUM,  FMT_ARG1(WORD_NUM),
+    WORD_INST_DEC,   "DEC",   1,     WORD_NUM,  FMT_ARG1(WORD_NUM),
     WORD_INST_INT,   "INT",   1,     WORD_NUM,  FMT_ARG1(WORD_STR),
     WORD_INST_STR,   "STR",   1,     WORD_STR,  FMT_ARG1(WORD_NUM),
     WORD_INST_LEN,   "LEN",   1,     WORD_NUM,  FMT_ARG1(WORD_STR),
-    WORD_INST_AT,    "AT",    2,     WORD_STR,  FMT_ARG2(WORD_STR, WORD_NUM),
-    WORD_INST_CAT,   "CAT",   2,     WORD_STR,  FMT_ARG2(WORD_STR, WORD_STR),
+    WORD_INST_AT,    "AT",    2,     WORD_NUM,  FMT_ARG2(WORD_STR, WORD_NUM),
+    WORD_INST_CAT,   "CAT",   VAARG, WORD_STR,  FMT_NOTP,
     WORD_INST_GOTO,  "GOTO",  1,     WORD_NONE, FMT_ARG1(WORD_NUM),
     WORD_INST_IF,    "IF",    2,     WORD_NONE, FMT_ARG2(WORD_NUM, WORD_ANY),
     WORD_INST_THEN,  "THEN",  VAARG, WORD_NONE, FMT_NOTP,
@@ -482,12 +482,19 @@ func get_variable_or_create([str], length) {
 }
 
 func check_goto_label([str], [length], pos) {
-    if ([length] == 0 || [str] != '[') {
+    : l = [length]
+
+    while (l > 0 && [str] == ' ') {
+        str++
+        l--
+    }
+
+    if (l == 0 || [str] != '[') {
         return 0
     }
 
     : i = 1
-    while (i < [length] && [str+i] != ']') {
+    while (i < l && [str + i] != ']') {
         i++
     }
 
@@ -504,7 +511,7 @@ func check_goto_label([str], [length], pos) {
     }
 
     [GOTO_TABLE + label_num] = pos // mark label as used
-    [length] = [length] - (i + 1)
+    [length] = l - (i + 1)
 
     return i + 1 // return the number of characters to skip
 }
@@ -536,7 +543,7 @@ func is_neol([str], length) {
 }
 
 func parse_str([str], length, [word], need_eol) { // word_s[word]
-    while (length > 0 && ([str] == ' ')) {
+    while (length > 0 && [str] == ' ') {
         str++
         length--
     }
@@ -852,7 +859,7 @@ func execute_word([word], [return_value]) {
             } elif (word_s[word_s[word].value + i].type < WORD_FIRST_INST) {
                 word_s[args + i].type  = word_s[word_s[word].value + i].type
                 word_s[args + i].value = word_s[word_s[word].value + i].value
-            } elif ((word_s[word].type != WORD_INST_IF || argc != 1) && (word_s[word].type != WORD_INST_ELSE || lastif != 1)) {
+            } elif ((word_s[word].type != WORD_INST_IF || argc != 1) && word_s[word].type != WORD_INST_WHILE && (word_s[word].type != WORD_INST_ELSE || lastif != 1)) {
                 a = execute_word(word_s[word].value + i, args + i)
                 if (a != EXEC_CONTINUE) {
                     return a
@@ -914,15 +921,8 @@ func execute_word([word], [return_value]) {
                 say_error("index %d is out of bounds for string of length %d\n", index, strlen(word_s[args].value))
                 retcode = EXEC_ERROR
             } else {
-                word_s[return_value].type  = WORD_FSTR
-                word_s[return_value].value = malloc(2)
-                if (word_s[return_value].value == NULL) {
-                    say_error("out of memory\n")
-                    retcode = EXEC_ERROR
-                } else {
-                    [word_s[return_value].value] = [word_s[args].value + index]
-                    [word_s[return_value].value + 1] = 0
-                }
+                word_s[return_value].type  = WORD_NUM
+                word_s[return_value].value = [word_s[args].value + index]
             }
         }
 
@@ -973,6 +973,25 @@ func execute_word([word], [return_value]) {
             lastif = !lastif
         }
 
+        case WORD_INST_WHILE {
+            : cnd = alloca(sizeof(word_s))
+
+            while (1) {
+                retcode = execute_word(word_s[word].value, cnd)
+                if (retcode != EXEC_CONTINUE) {
+                    break
+                }
+                if ((word_s[cnd].type == WORD_NUM && word_s[cnd].value) || (word_s[cnd].type == WORD_STR && [word_s[cnd].value])) {
+                    retcode = execute_word(word_s[word].value + sizeof(word_s), NULL)
+                    if (retcode != EXEC_CONTINUE) {
+                        break
+                    }
+                } else {
+                    break
+                }
+            }
+        }
+
         case WORD_INST_GOTO {
             if (word_s[args].value < 0 || word_s[args].value >= 100 || [GOTO_TABLE + word_s[args].value] == 0xFFFF) {
                 say_error("label '%d' is not defined\n", word_s[args].value)
@@ -1011,12 +1030,16 @@ func execute_word([word], [return_value]) {
 
         case WORD_INST_INC {
             if (word_s[args].type == WORD_VAR) {
+                word_s[return_value].type = WORD_NUM
+                word_s[return_value].value = var_s[word_s[args].value].value
                 var_s[word_s[args].value].value = var_s[word_s[args].value].value + 1
             }
         }
 
         case WORD_INST_DEC {
             if (word_s[args].type == WORD_VAR) {
+                word_s[return_value].type = WORD_NUM
+                word_s[return_value].value = var_s[word_s[args].value].value
                 var_s[word_s[args].value].value = var_s[word_s[args].value].value - 1
             }
         }
@@ -1136,11 +1159,6 @@ func execute_word([word], [return_value]) {
             word_s[return_value].value = word_s[args].value ^b word_s[args + sizeof(word_s)].value
         }
 
-        case WORD_INST_WHILE {
-            say_error("ni\n")
-            retcode = EXEC_ERROR
-        }
-
         case WORD_INST_IN {
             word_s[return_value].type  = WORD_NUM
             word_s[return_value].value = in(word_s[args].value)
@@ -1196,30 +1214,58 @@ func execute_word([word], [return_value]) {
         }
 
         case WORD_INST_CAT {
-            : len1 = strlen(word_s[args].value)
-            : len2 = strlen(word_s[args + sizeof(word_s)].value)
-            : str = malloc(len1 + len2 + 1)
+            : len = 0
+            for i (0, argc * sizeof(word_s), sizeof(word_s)) {
+                if (word_s[args + i].type == WORD_FSTR || word_s[args + i].type == WORD_STR) {
+                    len = len + strlen(word_s[args + i].value)
+                } elif (word_s[args + i].type == WORD_NUM) {
+                    if (word_s[args + i].value == 0 || word_s[args + i].value > 255) {
+                        say_error("'CAT' expects an ascii character (1-255), got %d\n", word_s[args + i].value)
+                        retcode = EXEC_ERROR
+                        break
+                    }
+                    len = len + 1
+                } else {
+                    say_error("'CAT' receives an unknown argument type: %s\n", get_word_name(word_s[args + i].type))
+                    retcode = EXEC_ERROR
+                    break
+                }
+                len = len + strlen(word_s[args + i].value)
+            }
+
+            : str = malloc(len + 1)
             if (!str) {
                 say_error("out of memory\n")
                 retcode = EXEC_ERROR
                 break
             }
 
+            len = 0
+
             : j
-            for i (0, len1) {
-                [str + i] = [word_s[args].value + i]
+            for i (0, argc * sizeof(word_s), sizeof(word_s)) {
+                if (word_s[args + i].type == WORD_FSTR || word_s[args + i].type == WORD_STR) {
+                    for j (0) {
+                        [str + len + j] = [word_s[args + i].value + j]
+                        if ([word_s[args + i].value + j] == 0) {
+                            break
+                        }
+                    }
+                    len = len + j
+                } elif (word_s[args + i].type == WORD_NUM) {
+                    [str + len] = word_s[args + i].value
+                    len = len + 1
+                }
             }
-            for j (0, len2) {
-                [str + i + j] = [word_s[args + sizeof(word_s)].value + j]
-            }
-            [str + i + j] = '\0'
+
+            [str + len] = 0
 
             word_s[return_value].type  = WORD_FSTR
             word_s[return_value].value = str
         }
 
         case WORD_INST_INT {
-            : len = strlen(word_s[args].value)
+            len = strlen(word_s[args].value)
 
             if (!isnumber(word_s[args].value, len)) {
                 say_error("'INT' expects a string containing only digits\n")
@@ -1543,7 +1589,7 @@ func shell_iter() {
     while (i < line_count) {
         : a = execute_word([lines + i], res)
 
-        if (word_s[res].type != WORD_NONE) {
+        if (word_s[[lines + i]].type != WORD_INST_INC && word_s[res].type != WORD_NONE) {
             screen_color = 0x0700
             print("=> ")
             print_word(res)

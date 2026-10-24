@@ -1,4 +1,4 @@
-#define STANDBY_TIMEOUT 300 // 15 seconds
+#define STANDBY_TIMEOUT 600 // 30 seconds
 
 func screen_flush_cursor(y, x) {
     out(0x1021, y * 80 + x)
