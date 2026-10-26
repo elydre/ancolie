@@ -1,4 +1,4 @@
-#define BASILISC_VERSION "0.7"
+#define BASILISC_VERSION "0.7b"
 
 // setings
 #define BASILISC_EXIT_KEY 0x8009 // ctrl + tab
@@ -60,6 +60,7 @@
 #define WORD_INST_SLEEP 50
 #define WORD_INST_PRINT 51
 #define WORD_INST_AT    52
+#define WORD_INST_COLOR 53
 
 #define VAARG           10 // max arguments in vafuncs
 
@@ -111,17 +112,18 @@ struct inst_s {
 }
 
 vafunc say_error(argc, [argp]) {
+    : old_color = screen_color
     screen_color = 0x0900
     print("Error: ")
     _lNOVA(printf, argc, argp)
-    screen_color = 0x0F00
+    screen_color = old_color
 }
 
 $ [g_var_tail] = NULL // var_s
 $ [[g_instructions]]
 $ g_debug = 0
 
-#define INSTRCTIONS_COUNT 47
+#define INSTRCTIONS_COUNT 48
 
 #define WORD_NONE 0
 #define WORD_VAR  1
@@ -168,6 +170,7 @@ g_instructions = array(
     WORD_INST_WRITE, "WRITE", VAARG, WORD_NONE, FMT_NOTP,
     WORD_INST_INPUT, "INPUT", 1,     WORD_STR,  FMT_ARG1(WORD_STR),
     WORD_INST_CLEAR, "CLEAR", 0,     WORD_NONE, FMT_NOTP,
+    WORD_INST_COLOR, "COLOR", 1,     WORD_NUM,  FMT_ARG1(WORD_NUM),
     WORD_INST_RAND,  "RAND",  0,     WORD_NUM,  FMT_NOTP,
     WORD_INST_SRAND, "SRAND", 1,     WORD_NONE, FMT_ARG1(WORD_NUM),
     WORD_INST_IN,    "IN",    1,     WORD_NUM,  FMT_ARG1(WORD_NUM),
@@ -405,44 +408,59 @@ func get_word_name(type) {
     return "unknown"
 }
 
-func print_word([word]) { // word_s[word]
-    :i
+func print_word(color, [word]) { // word_s[word]
+    : old_color = screen_color
+    screen_color = color
 
     if (word_s[word].type >= WORD_FIRST_INST) {
-        printf("( ")
+        putchar('(')
+        putchar(' ')
     }
 
     switch (word_s[word].type) {
         case WORD_NONE {
-            printf("None ")
+            print("None")
         }
         case WORD_VAR {
-            printf("[%s] ", var_s[word_s[word].value].name)
+            putchar('[')
+            print(var_s[word_s[word].value].name)
+            putchar(']')
         }
         case WORD_STR {
-            printf("\"%s\" ", word_s[word].value)
+            putchar('"')
+            print(word_s[word].value)
+            putchar('"')
         }
         case WORD_FSTR {
-            printf("f\"%s\" ", word_s[word].value)
+            putchar('f')
+            putchar('"')
+            print(word_s[word].value)
+            putchar('"')
         }
         case WORD_NUM {
-            printf("%d ", word_s[word].value)
+            putnbr(word_s[word].value)
         }
         default {
-            printf("%s ", get_word_name(word_s[word].type))
+            print(get_word_name(word_s[word].type))
         }
     }
+    putchar(' ')
 
     if (word_s[word].type < WORD_FIRST_INST) {
+        screen_color = old_color
         return
     }
 
-    i = 0
+    : i = 0
     while (word_s[word_s[word].value + i].type != WORD_NONE) {
-        print_word(word_s[word].value + i)
+        print_word(color, word_s[word].value + i)
         i = i + sizeof(word_s)
     }
-    printf(") ")
+
+    putchar(')')
+    putchar(' ')
+
+    screen_color = old_color
 }
 
 func get_variable([str], length) {
@@ -823,7 +841,7 @@ func check_interrupt() {
     : val = in(0x1010)
     while (val) {
         if (in(0x1011) == BASILISC_EXIT_KEY && val == 3) {
-            printf("$07execution interrupted by user$0F\n")
+            printf("$07execution interrupted by user\n")
             return 1
         }
         val = in(0x1010)
@@ -879,6 +897,17 @@ func execute_word([word], [return_value]) {
         case WORD_STR, WORD_FSTR, WORD_NUM {
             word_s[return_value].type  = word_s[word].type
             word_s[return_value].value = word_s[word].value
+        }
+
+        case WORD_INST_COLOR {
+            if (word_s[args].value > 0xFF) {
+                say_error("color value %d is out of range (0-255)\n", word_s[args].value)
+                retcode = EXEC_ERROR
+            } else {
+                word_s[return_value].type  = WORD_NUM
+                word_s[return_value].value = screen_color >> 8
+                screen_color = word_s[args].value << 8
+            }
         }
 
         case WORD_INST_PRINT, WORD_INST_WRITE {
@@ -977,6 +1006,10 @@ func execute_word([word], [return_value]) {
             : cnd = alloca(sizeof(word_s))
 
             while (1) {
+                if (check_interrupt()) {
+                    retcode = EXEC_END
+                    break
+                }
                 retcode = execute_word(word_s[word].value, cnd)
                 if (retcode != EXEC_CONTINUE) {
                     break
@@ -1288,7 +1321,7 @@ func execute_word([word], [return_value]) {
             }
 
             if (input(input_str, 64) == INTMAX) {
-                printf("\n$07execution interrupted by user$0F\n")
+                printf("\n$07execution interrupted by user\n")
                 free(input_str)
                 retcode = EXEC_END
                 break
@@ -1338,28 +1371,34 @@ func execute_word([word], [return_value]) {
 
         case WORD_INST_HELP {
             if (argc == 0) {
-                printf("$02GENERAL OPERATION -$07\n")
+                : old_color = screen_color
+                screen_color = 0x0700
+                printf("$02GENERAL OPERATION -\n")
                 print("  The current interface is an interactive shell,\n")
                 print("  you can write code and execute it by pressing Enter twice.\n")
                 printf("  Use $0FED$07 to write longer programs, then exit by pressing CTRL+TAB.\n")
                 printf("  You can then execute the program using $0FRUN$07.\n")
                 printf("  Defined variables remain accessible; to clear them, use $0FNEW$07.\n")
-                printf("$02BASILISC LANGUAGE -$07\n")
-                printf("  $07Variable assignment     $0Fname = 123\n")
-                printf("  $07Instruction call        $0FinstA argA1 (instB (instC argC1) argB2) argA3\n")
-                printf("  $07Create a label          $0F[0]\n")
-                printf("  $07Jump to label           $0FGOTO 0\n")
-                printf("  $07Conditional structure   $0FIF (something) (do_something)\n")
-                printf("  $07Specific information    $0FHELP \"inst\"\n")
-                printf("$02AVAILABLE INSTRUCTIONS -$0F\n")
+                printf("$02BASILISC LANGUAGE -\n")
+                printf("  Variable assignment     $0Fname = 123\n")
+                printf("  Instruction call        $0FinstA argA1 (instB (instC argC1) argB2) argA3\n")
+                printf("  Create a label          $0F[0]\n")
+                printf("  Jump to label           $0FGOTO 0\n")
+                printf("  Conditional structure   $0FIF (something) (do_something)\n")
+                printf("  Specific information    $0FHELP \"inst\"\n")
+                printf("$02AVAILABLE INSTRUCTIONS -\n")
+                screen_color = 0x0F00
                 for i (0, INSTRCTIONS_COUNT * sizeof(inst_s), sizeof(inst_s)) {
-                    printf("  %s", inst_s[g_instructions + i].name)
+                    putchar(' ')
+                    putchar(' ')
+                    print(inst_s[g_instructions + i].name)
                     screen_x = screen_x + (10 - screen_x % 10)
                     if (screen_x > 60) {
                         putchar('\n')
                     }
                 }
-                printf("\n$07More information at: github.com/elydre/ancolie$0F\n")
+                printf("\n$07More information at: github.com/elydre/ancolie\n")
+                screen_color = old_color
                 break
             }
 
@@ -1413,13 +1452,13 @@ func execute_word([word], [return_value]) {
             : heap_addr = new_word(0)
             : proglen = strlen(STRPROG_DEBUT)
 
-            printf("$02SYSTEM STATUS -$07\n")
-            printf("  $07Variable table  $0F%d%%$07 (%d defined)\n", (new_var(0) - VARTAB_DEBUT) / (0x1000 / 100), varcount)
-            printf("  $07Heap usage      $0F%d%%$07 (%d words used)\n", (heap_addr - HEAP_DEBUT) / ([_lSP] / 100), heap_addr - HEAP_DEBUT)
-            printf("  $07Program memory  $0F%d%%$07 (%d words used)\n", proglen / (0x2000 / 100), proglen)
-            printf("  $07Allocations     $0F%d\n", malloc_data.malloc_count)
-            printf("  $07Current heap    $0F%x\n", heap_addr)
-            printf("  $07Stack pointer   $0F%x\n", [_lSP])
+            printf("$02SYSTEM STATUS -\n")
+            printf("$07  Variable table  $0F%d%%$07 (%d defined)\n", (new_var(0) - VARTAB_DEBUT) / (0x1000 / 100), varcount)
+            printf("$07  Heap usage      $0F%d%%$07 (%d words used)\n", (heap_addr - HEAP_DEBUT) / ([_lSP] / 100), heap_addr - HEAP_DEBUT)
+            printf("$07  Program memory  $0F%d%%$07 (%d words used)\n", proglen / (0x2000 / 100), proglen)
+            printf("$07  Allocations     $0F%d\n", malloc_data.malloc_count)
+            printf("$07  Current heap    $0F%x\n", heap_addr)
+            printf("$07  Stack pointer   $0F%x\n", [_lSP])
         }
 
         case WORD_INST_DEBUG {
@@ -1477,19 +1516,19 @@ func program_run() {
         inst = parse_str(program, end, NULL, 1)
 
         if (inst == NULL) {
-            printf("$09on %S$0F\n", program, end)
+            printf("$09on %S\n", program, end)
             return 1
         }
 
         if (g_debug) {
-            print_word(inst)
-            printf("\n")
+            print_word(0x0700, inst)
+            print("\n")
         }
 
         if (check_types(inst) == EXEC_ERROR) {
             printf("$09on ")
-            print_word(inst)
-            printf("$0F\n")
+            print_word(0x0900, inst)
+            print("\n")
             return
         }
 
@@ -1499,7 +1538,7 @@ func program_run() {
         program = program + end + 1
     }
 
-    printf("$07execution started !$0F\n")
+    printf("$07execution started !\n")
 
     i = 0
     : [res] = alloca(sizeof(word_s))
@@ -1511,8 +1550,8 @@ func program_run() {
 
         if (a == EXEC_ERROR) {
             printf("$09on ")
-            print_word([lines + i])
-            printf("$0F\n")
+            print_word(0x0900, [lines + i])
+            print("\n")
             break
         } elif (a == EXEC_END) {
             break
@@ -1534,6 +1573,9 @@ func shell_iter() {
     : [lines] = alloca(sizeof(word_s) * 32)
     : line_count = 0
 
+    : old_color = screen_color
+    screen_color = 0x0F00
+
     print("# ")
 
     while (1) {
@@ -1543,7 +1585,7 @@ func shell_iter() {
 
         if (end == INTMAX) {
             if (line_count) {
-                printf("\n$07cancelled$0F\n")
+                printf("\n$07cancelled\n")
             } else {
                 screen_clear()
             }
@@ -1593,10 +1635,12 @@ func shell_iter() {
 
     for i (0, line_count) {
         if (g_debug) {
-            print_word([lines + i])
-            printf("\n")
+            print_word(0x0700, [lines + i])
+            print("\n")
         }
     }
+
+    screen_color = old_color
 
     i = 0
     : [res] = alloca(sizeof(word_s))
@@ -1604,20 +1648,18 @@ func shell_iter() {
         : a = execute_word([lines + i], res)
 
         if (word_s[[lines + i]].type != WORD_INST_INC && word_s[res].type != WORD_NONE) {
-            screen_color = 0x0700
-            print("=> ")
-            print_word(res)
-            screen_color = 0x0F00
+            printf("$07=> ")
+            print_word(0x0700, res)
+            print("\n")
             if (word_s[res].type == WORD_FSTR) {
                 free(word_s[res].value)
             }
-            print("\n")
         }
 
         if (a == EXEC_ERROR) {
-            printf("$09on ")
-            print_word([lines + i])
-            printf("$0F\n")
+            print("$09on ")
+            print_word(0x0900, [lines + i])
+            print("\n")
             break
         } elif (a == EXEC_END) {
             break
@@ -1629,12 +1671,12 @@ func shell_iter() {
     }
 }
 
-print("\n")
-printf("$0F        ___   \\\\\\      $02BASILISC %s\n", BASILISC_VERSION)
-printf("$0F        ). \\  ((°<     2026 elydre\n")
-printf("$0F   ______):.`-//~     \n")
-printf("$0F     ---==_ __.'       $07Type $0Fhelp$07 for the user guide\n" )
-printf("$0F           TT          $07and press Enter twice.$0F\n\n" )
+putchar('\n')
+printf("        ___   \\\\\\      $02BASILISC %s\n", BASILISC_VERSION)
+printf("        ). \\  ((°<     2026 elydre\n")
+printf("   ______):.`-//~     \n")
+printf("     ---==_ __.'       $07Type $0Fhelp$07 for the user guide\n" )
+printf("           TT          $07and press Enter twice.\n\n" )
 
 malloc_init(MALLOC_DEBUT, MALLOC_SIZE, 16)
 [STRPROG_DEBUT] = 0

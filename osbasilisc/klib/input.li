@@ -1,4 +1,5 @@
 #define STANDBY_TIMEOUT 600 // 30 seconds
+#define INPUT_COLOR 0x0F00
 
 func screen_flush_cursor(y, x) {
     out(0x1021, y * 80 + x)
@@ -23,7 +24,10 @@ func entry_standby() {
 }
 
 func input(buffer, size) {
-    :buffer_i i type chr cursor
+    : buffer_i i type cursor chr = 0
+    : old_color = screen_color
+    screen_color = INPUT_COLOR
+
     buffer_i = 0
     cursor = 0
 
@@ -32,7 +36,7 @@ func input(buffer, size) {
 
     : sleep_counter = 0
 
-    while 1 {
+    while chr != BASILISC_EXIT_KEY {
         type = in(0x1010)
 
         if type == 0 {
@@ -113,6 +117,7 @@ func input(buffer, size) {
 
         elif chr == '\r' {
             [buffer + buffer_i] = 0
+            screen_color = old_color
             return buffer_i
         }
 
@@ -129,9 +134,8 @@ func input(buffer, size) {
                 screen_flush_cursor(debut_y, debut_x + cursor)
             }
         }
-
-        elif chr == BASILISC_EXIT_KEY {
-            return INTMAX
-        }
     }
+    
+    screen_color = old_color
+    return INTMAX
 }

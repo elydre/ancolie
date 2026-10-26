@@ -108,9 +108,10 @@ func screen_mk_color(str) {
 }
 
 vafunc printf(argc, argp) {
-    : i c str
+    : i c str old
 
     str = [argp]
+    old = screen_color
 
     for i (0) {
         c = [str + i]
@@ -155,6 +156,10 @@ vafunc printf(argc, argp) {
                 putchar('$')
                 continue
             }
+            if [str + i] == 'R' {
+                screen_color = old
+                continue
+            }
             c = screen_mk_color(str + i)
             if c == 1 {
                 print("\n[printf invalid color]\n")
@@ -169,4 +174,6 @@ vafunc printf(argc, argp) {
             screen_flush()
         }
     }
+
+    screen_color = old
 }
