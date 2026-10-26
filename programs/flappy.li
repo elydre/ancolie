@@ -1,0 +1,212 @@
+#define MAX_TUBE 14
+#define HOLE_SIZE 5
+#define TUBE_SPACE 25
+#define TUBES_LEN 10
+#define PLAYER_X 2
+
+struct context_t {
+	: [tubes]
+	: seed
+	: y
+	: x
+	: score
+}
+
+$ ctx = NULL
+ctx = alloca(sizeof(context_t))
+
+: _ = alloca(TUBES_LEN)
+context_t[ctx].tubes = _
+context_t[ctx].seed = in(0x1030)
+context_t[ctx].y = 25 / 2
+context_t[ctx].x = TUBE_SPACE
+context_t[ctx].score = 0
+
+func rand() {
+	context_t[ctx].seed = context_t[ctx].seed * 3579 + 207
+	return (context_t[ctx].seed % MAX_TUBE) + 4
+}
+
+func draw_line(x, height) {
+	if (height == 0 || height >= 20) {
+		return 
+	}
+	: _
+	: y = 24
+	for _ (0, height) {
+		[_lSCREEN + x + y * 80] = 0xff00
+		y--
+	}
+
+	for _ (0, HOLE_SIZE) {
+		[_lSCREEN + x + y * 80] = 0x0000
+		y--
+	}
+
+	while (y != 1) {
+		[_lSCREEN + x + y * 80] = 0xff00
+		y--
+	}
+}
+
+func advance() {
+	context_t[ctx].x = context_t[ctx].x - 1
+	if (context_t[ctx].x != 0xffff) {
+		return
+	}
+	context_t[ctx].x = TUBE_SPACE
+
+	memmov(context_t[ctx].tubes, context_t[ctx].tubes + 1, TUBES_LEN - 1)
+	[context_t[ctx].tubes + TUBES_LEN - 1] = rand()
+}
+
+func redraw() {
+	memset(_lSCREEN + 80 * 2, 0, 80*23)
+	: i
+	: x = 0
+	for i (0, 80 / TUBE_SPACE) {
+		draw_line(x + context_t[ctx].x, [context_t[ctx].tubes + i])
+		x = x + TUBE_SPACE
+	}
+}
+
+func draw_player() {
+	
+	: is_dead = 0
+	$ is_up = 0
+	$ timeout = 3
+	if ([_lSCREEN + PLAYER_X + context_t[ctx].y * 80] != 0) {
+		dump(1)
+		is_dead = 1
+	}
+
+	timeout--
+	if (timeout == 0) {
+		timeout = 3
+		is_up = (is_up == 0)
+	}
+	
+	[_lSCREEN + PLAYER_X + context_t[ctx].y * 80] = 0x7700
+	[_lSCREEN + PLAYER_X + context_t[ctx].y * 80 + 1] = 0xbb00
+
+	if (is_up) {
+		[_lSCREEN + PLAYER_X + (context_t[ctx].y - 1) * 80] = 0xff00
+	}
+	else {
+		[_lSCREEN + PLAYER_X + (context_t[ctx].y + 1) * 80] = 0xff00
+	}
+	return is_dead
+}
+
+func inc_score() {
+	if ([_lSCREEN + PLAYER_X + 24 * 80] != 0) {
+		context_t[ctx].score = context_t[ctx].score + 1
+	}
+}
+
+func draw_score(score) {
+	: i = 0
+	for i (0, 5) {
+		[_lSCREEN + 80 - 1 - i] = '0' |b (0x0f00)
+	}
+
+	for i (0, 5) {
+		[_lSCREEN + 80 - 1 - i] = ('0' + score % 10) |b (0x0f00)
+		score = score / 10
+	}
+}
+
+func update_key() {
+	:state = 0
+
+	state = in(0x1010)
+	if (state == 0) {
+		return
+	}
+	:key = 0
+	key = in(0x1011)
+	if (state == 3) {
+		if (key == 81 && context_t[ctx].y < 23) {
+			context_t[ctx].y = context_t[ctx].y + 1
+		}
+		elif (key == 82 && context_t[ctx].y > 2) {
+			context_t[ctx].y = context_t[ctx].y - 1
+		}
+	}
+}
+
+func wait_key() {
+	while (1) {
+		
+		: state = 0
+
+		state = in(0x1010)
+		dump(state)
+		if (state == 3 || state == 1) {
+			in(0x1011)
+			continue
+		}
+		if (state == 4 || state == 2) {
+			in(0x1011)
+			return
+		}
+
+		out(0x1031, 40)
+	}
+}
+
+for _ (0, 80) {
+	[_lSCREEN + _] = 0
+	[_lSCREEN + _ + 80] = 0xff00
+}
+
+: name = "Flappy Bird                       score:"
+_ = 0
+while ([name + _]) {
+	[_lSCREEN + _ + 34] = ([name + _] |b (0x0f00))
+	_++
+}
+: start_text = "Press a Key"
+
+while (1) {
+	for _ (0, TUBES_LEN) {
+		context_t[ctx].x = 0
+		advance()
+	}
+	[context_t[ctx].tubes + 0] = 0
+	[context_t[ctx].tubes + 1] = 0
+
+	context_t[ctx].y = 25 / 2
+	context_t[ctx].x = TUBE_SPACE
+	context_t[ctx].score = 0
+
+	: i = 0
+	: start_len = 0
+	while ([start_text + i]) {
+		i++
+	}
+
+	start_len = i
+	i = 0
+	: offset = 80 / 2 - start_len / 2
+	while (i < start_len) {
+		[_lSCREEN + i + offset + 80 * 10] = [start_text + i] |b (0x0900)
+		i++
+	}
+	out(0x1020, 0)
+	wait_key()
+
+	while (1) {
+		update_key()
+		advance()
+		redraw()
+		// read screen to check if collide
+		if (draw_player()) {
+			break
+		}
+		inc_score()
+		draw_score(context_t[ctx].score)
+		out(0x1020, 0)
+		out(0x1031, 1)
+	}
+}
