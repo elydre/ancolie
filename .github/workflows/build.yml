@@ -22,8 +22,9 @@ jobs:
           sudo apt install -y python3
 
       - name: Compile
-        run: python llc.py osbasilisc/main.li -o basilisc.bin
-        run: python llc.py programs/flappy.li -o flappy.bin
+        run: |
+          python llc.py osbasilisc/main.li -o basilisc.bin
+          python llc.py programs/flappy.li -o flappy.bin
 
       - name: Upload executable to GitHub Release
         env:
