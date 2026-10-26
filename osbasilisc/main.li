@@ -1,4 +1,4 @@
-#define BASILISC_VERSION "0.6b"
+#define BASILISC_VERSION "0.7"
 
 // setings
 #define BASILISC_EXIT_KEY 0x8009 // ctrl + tab
@@ -249,13 +249,13 @@ func tok_end([str], length) {
                 return i
             }
 
-            if (length == 1 || !is_in([str + i], "!=")) {
+            if (length == 1 || !is_in([str + i], "!=<>")) {
                 return 1
             }
 
             i++
 
-            return 1 + ([str + i] == '=')
+            return 1 + is_in([str + i], "=<>")
         }
 
         i++
@@ -1267,14 +1267,13 @@ func execute_word([word], [return_value]) {
         case WORD_INST_INT {
             len = strlen(word_s[args].value)
 
-            if (!isnumber(word_s[args].value, len)) {
-                say_error("'INT' expects a string containing only digits\n")
-                retcode = EXEC_ERROR
-                break
-            }
-
             word_s[return_value].type  = WORD_NUM
-            word_s[return_value].value = str2int(word_s[args].value, len)
+
+            if (isnumber(word_s[args].value, len)) {
+                word_s[return_value].value = str2int(word_s[args].value, len)
+            } else {
+                word_s[return_value].value = 0xFFFF
+            }
         }
 
         case WORD_INST_INPUT {
@@ -1288,7 +1287,13 @@ func execute_word([word], [return_value]) {
                 break
             }
 
-            input(input_str, 64)
+            if (input(input_str, 64) == INTMAX) {
+                printf("\n$07execution interrupted by user$0F\n")
+                free(input_str)
+                retcode = EXEC_END
+                break
+            }
+
             putchar('\n')
             screen_flush()
 
@@ -1536,6 +1541,15 @@ func shell_iter() {
 
         : end = input(strline, 64)
 
+        if (end == INTMAX) {
+            if (line_count) {
+                printf("\n$07cancelled$0F\n")
+            } else {
+                screen_clear()
+            }
+            return
+        }
+
         while ([strline] == ' ') {
             strline++
             end--
@@ -1625,7 +1639,7 @@ printf("$0F           TT          $07and press Enter twice.$0F\n\n" )
 malloc_init(MALLOC_DEBUT, MALLOC_SIZE, 16)
 [STRPROG_DEBUT] = 0
 
-// : prog = "[0]\nat \"v\" 0\nsstat\ngoto 0"
+// : prog = "player = \"O\"\nclear\n[6]\ngame = \".........\"\nround = 0\n[0]\nif (== (inc round) 9) then (print \"egalite !\") goto 6\nif (== player \"O\") player = \"X\"\nelse player = \"O\"\nprint \"c'est au joueur\" player\n[9]\nx = int input \"x > \"\ndec x\nif (> x 2) then (print \"X non valide\") goto 9\n[1]\ny = int input \"y > \"\ndec y\nif (> y 2) then (print \"Y non valide\") goto 1\ncoo = + x (* y 3)\nif (!= 46 at game coo) then (print \"case deja jouer\") goto 9\ntmp = \"\"\ni = 0\n[2]\nif (== i coo) tmp = cat tmp player\nelse tmp = cat tmp at game i\nwrite cat at tmp inc i\nif (== (% i 3) 0) print\nif (< i 9) goto 2\ngame = tmp\n\"check win\"\ni = 0\n[3]\nn = at game i\nif (and (!= n 46) and (== n (at game + i 3)) (== n (at game + i 6))) goto 4\nn = at game * i 3\nif (== n 46) goto 7\nif (and (== n (at game + (* i 3) 1)) (== n (at game + (* i 3) 2))) goto 5\n[7]\ninc i\nif (< i 3) goto 3\nn = at game 4\nif (== n 46) goto 0\nif (and (== n at game 0) (== n at game 8)) goto 8\nif (and (== n at game 2) (== n at game 6)) goto 8\ngoto 0\n[4] print \"le joueur\" player \"a gagner verticalement, bravo !!\"\ngoto 6\n[5] print \"le joueur\" player \"a gagner horizontalement, bravo !!\"\ngoto 6\n[8] print \"le joueur\" player \"a gagner en diagonal, bravo !!\"\ngoto 6"
 // memmov(STRPROG_DEBUT, prog, strlen(prog))
 
 while (1) {

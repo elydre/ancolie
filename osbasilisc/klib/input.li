@@ -109,28 +109,29 @@ func input(buffer, size) {
             }
             [_lSCREEN + (80 * screen_y + screen_x)] = ' '
             screen_flush_cursor(debut_y, debut_x + cursor)
-            continue
         }
 
-        if chr == '\r' {
+        elif chr == '\r' {
             [buffer + buffer_i] = 0
             return buffer_i
         }
 
-        if chr == 'P' { // left arrow
+        elif chr == 'P' { // left arrow
             if cursor > 0 {
                 cursor--
                 screen_flush_cursor(debut_y, debut_x + cursor)
             }
-            continue
         }
 
-        if chr == 'O' { // right arrow
+        elif chr == 'O' { // right arrow
             if cursor < buffer_i {
                 cursor++
                 screen_flush_cursor(debut_y, debut_x + cursor)
             }
-            continue
+        }
+
+        elif chr == BASILISC_EXIT_KEY {
+            return INTMAX
         }
     }
 }

@@ -1,66 +1,205 @@
-func editor_line_start([program], cursor) {
-    while cursor > 0 && [program + cursor - 1] != '\n' {
-        cursor--
+#define ED_COLOR_TEXT 0x0F00 // program color
+#define ED_COLOR_LINE 0x0700 // line number color
+#define ED_COLOR_CRLN 0x0100 // line number color for current line
+
+#define ED_MARGIN 4
+#define ED_CURX_MAX 75 // 80 - ED_MARGIN - 1
+
+$ ed_curx = 0
+$ ed_cury = 0
+$ ed_yoff = 0
+$ ed_curstr = 0
+$ ed_len = 0
+$ ed_linecount = 0
+
+func ed_line_start(from) {
+    : i = from
+    while (i > 0) {
+        if ([STRPROG_DEBUT + i - 1] == '\n') {
+            break
+        }
+        i--
     }
-    return cursor
+    return i
 }
 
-func editor_line_end([program], length, cursor) {
-    while cursor < length && [program + cursor] != '\n' {
-        cursor++
-    }
-    return cursor
-}
-
-$ cursor_x cursor_y
-
-func editor_redraw([program], length, cursor) {
-    : i = 0
-
-    screen_clear()
-
-    screen_color = 0x0700
-    putnbr(1)
-    screen_color = 0x0F00
-    screen_x = 4
-
-    while i < cursor {
-        putchar([program + i])
-        if ([program + i] == '\n') {
-            screen_color = 0x0700
-            putnbr(screen_y + 1)
-            screen_color = 0x0F00
-            screen_x = 4
+func ed_line_end(from) {
+    : i = from
+    while (i < ed_len) {
+        if ([STRPROG_DEBUT + i] == '\n') {
+            break
         }
         i++
     }
+    return i
+}
 
-    cursor_x = screen_x
-    cursor_y = screen_y
-
-    while i < length {
-        putchar([program + i])
-        if ([program + i] == '\n') {
-            screen_color = 0x0700
-            putnbr(screen_y + 1)
-            screen_color = 0x0F00
-            screen_x = 4
-        }
-        i++
-    }
-
-    out(0x1021, cursor_y * 80 + cursor_x)
+func ed_draw_cursor() {
+    out(0x1021, (ed_cury - ed_yoff) * 80 + ed_curx + ED_MARGIN)
     out(0x1020, 0)
 }
 
-func program_edit() {
-    : program = STRPROG_DEBUT
-    : length = strlen(program)
-    : cursor = 0
-    : type key
-    : line_start line_end column target
+func ed_draw_line_end(clear_old) {
+    : x = ed_curx + ED_MARGIN
+    : y = (ed_cury - ed_yoff) * 80
 
-    editor_redraw(program, length, cursor)
+    : i
+    for i (0) {
+        if (x >= 79) {
+            return
+        }
+        if (ed_curstr + i >= ed_len || [STRPROG_DEBUT + ed_curstr + i] == '\n') {
+            break
+        }
+        [_lSCREEN + y + x++] = [STRPROG_DEBUT + ed_curstr + i] |b ED_COLOR_TEXT
+    }
+    if (clear_old) {
+        while (x < 79) {
+            [_lSCREEN + y + x++] = ' '
+        }
+    } else {
+        [_lSCREEN + y + x] = ' '
+    }
+}
+
+func ed_draw_linesno() {
+    : no = ed_yoff
+    : y
+    for y (0, 25 * 80, 80) {
+        : color
+        if (ed_cury == no) {
+            color = ED_COLOR_CRLN
+        } else {
+            color = ED_COLOR_LINE
+        }
+
+        no++
+
+        if (no > ed_linecount) {
+            memset(_lSCREEN + y, ' ', ED_MARGIN)
+            break
+        }
+
+        : i = 0
+        : tmp = no
+        while (tmp > 0) {
+            tmp = tmp / 10
+            i++
+        }
+
+        [_lSCREEN + y + i] = ' '
+
+        tmp = no
+        while (tmp > 0) {
+            i--
+            [_lSCREEN + y + i] = ((tmp % 10) + '0') |b color
+            tmp = tmp / 10
+        }
+    }
+}
+
+func ed_draw_line(y, debut) {
+    : x = ED_MARGIN
+    y = y * 80
+
+    : i
+    for i (0) {
+        if (x >= 79) {
+            return
+        }
+        if (debut + i >= ed_len || [STRPROG_DEBUT + debut + i] == '\n') {
+            break
+        }
+        [_lSCREEN + y + x++] = [STRPROG_DEBUT + debut + i] |b ED_COLOR_TEXT
+    }
+    while (x < 79) {
+        [_lSCREEN + y + x++] = ' '
+    }
+}
+
+func ed_delete_char(from) {
+    if (ed_curstr == ed_len) {
+        return
+    }
+    : c = [STRPROG_DEBUT + ed_curstr] == '\n'
+    memmov(STRPROG_DEBUT + ed_curstr, STRPROG_DEBUT + ed_curstr + 1, ed_len - ed_curstr)
+    ed_len--
+
+    if (c) {
+        ed_linecount--
+        if (from == INTMAX) {
+            // move the rest of the screen up
+            : l = ed_cury - ed_yoff + 1
+            memmov(_lSCREEN + l * 80, _lSCREEN + (l + 1) * 80, (24 - l) * 80)
+
+            // get the last line of the screen
+            : y = ed_cury
+            : end = ed_line_end(ed_curstr) + 1
+            while (y - ed_yoff < 23) {
+                if (end >= ed_len) {
+                    break
+                }
+                end = ed_line_end(end) + 1
+                y++
+            }
+            if (end < ed_len) {
+                ed_draw_line(24, end)
+            } else {
+                // fill last line with spaces
+                memset(_lSCREEN + (24 * 80), ' ', 80)
+            }
+        }
+        ed_draw_linesno()
+    }
+
+    if (from == INTMAX) {
+        ed_draw_line_end(0)
+    } else {
+        ed_draw_line(ed_cury - ed_yoff, from)
+    }
+
+    ed_draw_cursor()
+}
+
+func ed_full_draw() {
+    screen_clear()
+
+    : i = 0
+    : y
+
+    // skip lines before ed_yoff
+    for y (0, ed_yoff) {
+        i = ed_line_end(i) + 1
+    }
+
+    for y (0, 25) {
+        if (i >= ed_len) {
+            break
+        }
+        ed_draw_line(y, i)
+        i = ed_line_end(i) + 1
+    }
+
+    ed_draw_linesno()
+    ed_draw_cursor()
+}
+
+func program_edit() {
+    if (ed_len == 0) {
+        ed_linecount = 0
+        while ([STRPROG_DEBUT + ed_len] != 0) {
+            if ([STRPROG_DEBUT + ed_len] == '\n') {
+                ed_linecount++
+            }
+            ed_len++
+        }
+        ed_linecount++
+    }
+
+    : type key
+    : line_start newline_start line_end newline_end column
+
+    ed_full_draw()
 
     while 1 {
         type = in(0x1010)
@@ -77,74 +216,165 @@ func program_edit() {
         key = in(0x1011)
 
         if (type == 1) {
-            if (key >= 32 && key <= 126 && length < STRPROG_SIZE - 1) {
-                memmov(program + cursor + 1, program + cursor, length - cursor)
-                [program + cursor] = key
-                cursor++
-                length++
-                [program + length] = 0
+            if (key >= 32 && key <= 126 && ed_len < STRPROG_SIZE - 1 && ed_curx < ED_CURX_MAX) {
+                memmov(STRPROG_DEBUT + ed_curstr + 1, STRPROG_DEBUT + ed_curstr, ed_len - ed_curstr)
+                [STRPROG_DEBUT + ed_curstr] = key
+                ed_len++
+                ed_draw_line_end(0)
+                ed_curstr++
+                ed_curx++
+                ed_draw_cursor()
             }
         } elif key == BASILISC_EXIT_KEY {
-            [program + length] = 0
+            [STRPROG_DEBUT + ed_len] = 0
             screen_clear()
-            return length
-        } elif key == 'P' {
-            if cursor > 0 {
-                cursor--
+            return ed_len
+        } elif key == 'P' { // left
+            if ed_curx == 0 {
+                continue
             }
-        } elif key == 'O' {
-            if cursor < length {
-                cursor++
+            ed_curstr--
+            ed_curx--
+            ed_draw_cursor()
+        } elif key == 'O' { // right
+            if ed_curstr == ed_len {
+                continue
             }
-        } elif key == 'R' {
-            line_start = editor_line_start(program, cursor)
-            column = cursor - line_start
-            if line_start > 0 {
-                line_end = line_start - 1
-                target = editor_line_start(program, line_end)
-                line_end = editor_line_end(program, length, target)
-                if target + column > line_end {
-                    cursor = line_end
-                } else {
-                    cursor = target + column
-                }
+            if ([STRPROG_DEBUT + ed_curstr] == '\n') {
+                continue
             }
-        } elif key == 'Q' {
-            line_start = editor_line_start(program, cursor)
-            column = cursor - line_start
-            line_end = editor_line_end(program, length, cursor)
-            if line_end < length {
-                target = line_end + 1
-                line_end = editor_line_end(program, length, target)
-                if target + column > line_end {
-                    cursor = line_end
-                } else {
-                    cursor = target + column
-                }
+            if (ed_curx >= ED_CURX_MAX) {
+                continue
             }
-        } elif key == '\b' {
-            if cursor > 0 {
-                memmov(program + cursor - 1, program + cursor, length - cursor)
-                cursor--
-                length--
-                [program + length] = 0
-            }
-        } elif key == 127 {
-            if cursor < length {
-                memmov(program + cursor, program + cursor + 1, length - cursor - 1)
-                length--
-                [program + length] = 0
-            }
-        } elif key == '\r' {
-            if length < STRPROG_SIZE - 1 {
-                memmov(program + cursor + 1, program + cursor, length - cursor)
-                [program + cursor] = '\n'
-                cursor++
-                length++
-                [program + length] = 0
-            }
+            ed_curstr++
+            ed_curx++
+            ed_draw_cursor()
         }
+        elif key == 'R' { // up
+            if (ed_cury == 0) {
+                continue
+            }
+            line_start = ed_line_start(ed_curstr)
+            newline_end = line_start - 1
+            
+            column = ed_curstr - line_start
 
-        editor_redraw(program, length, cursor)
+            newline_start = ed_line_start(newline_end)
+            
+            if newline_start + column > newline_end {
+                ed_curstr = newline_end
+                ed_curx = newline_end - newline_start
+            } else {
+                ed_curstr = newline_start + column
+                ed_curx = column
+            }
+
+            if ((ed_cury--) - ed_yoff == 0) {
+                ed_yoff--
+                // move screen down
+                memmov(_lSCREEN + 80, _lSCREEN, 24 * 80)
+                // draw the new line at the top
+                ed_draw_line(ed_cury - ed_yoff, newline_start)
+            }
+
+            ed_draw_linesno()
+            ed_draw_cursor()
+        } elif key == 'Q' { // down
+            line_start = ed_line_start(ed_curstr)
+            line_end = ed_line_end(ed_curstr)
+
+            newline_start = line_end + 1
+            if newline_start > ed_len {
+                continue
+            }
+
+            column = ed_curstr - line_start
+            newline_end = ed_line_end(newline_start)
+
+            if newline_start + column > newline_end {
+                ed_curstr = newline_end
+                ed_curx = newline_end - newline_start
+            } else {
+                ed_curstr = newline_start + column
+                ed_curx = column
+            }
+
+            ed_cury++
+
+            if (ed_cury - ed_yoff >= 25) {
+                ed_yoff++
+                // move screen up
+                memmov(_lSCREEN, _lSCREEN + 80, 24 * 80)
+                // draw the new line at the bottom
+                ed_draw_line(ed_cury - ed_yoff, newline_start)
+            }
+
+            ed_draw_linesno()
+            ed_draw_cursor()
+        }
+        elif key == '\b' {
+            if ed_curstr == 0 {
+                continue
+            }
+
+            if ed_curx {
+                ed_curstr--
+                ed_curx--
+                ed_delete_char(INTMAX)
+                continue
+            }
+
+            newline_start = ed_line_start(ed_curstr - 1)
+            ed_curstr--
+            ed_curx = ed_curstr - newline_start
+
+            if (ed_curx > ED_CURX_MAX) {
+                ed_curx = ED_CURX_MAX
+                ed_curstr = newline_start + ED_CURX_MAX
+            }
+
+            if ((ed_cury--) - ed_yoff == 0) {
+                ed_yoff--
+                ed_delete_char(newline_start)
+                continue
+            }
+
+            ed_delete_char(INTMAX)
+        } elif key == 0x7F {
+            ed_delete_char(INTMAX)
+        } elif key == '\r' {
+            if ed_len >= STRPROG_SIZE - 1 {
+                continue
+            }
+            // insert newline
+            memmov(STRPROG_DEBUT + ed_curstr + 1, STRPROG_DEBUT + ed_curstr, ed_len - ed_curstr)
+            [STRPROG_DEBUT + ed_curstr] = '\n'
+            ed_len++
+
+            ed_linecount++
+
+            // fill the rest of the line with spaces
+            memset(_lSCREEN + (ed_cury - ed_yoff) * 80 + ed_curx + ED_MARGIN, ' ', 80 - ed_curx - ED_MARGIN)
+
+            if (ed_cury - ed_yoff + 1 >= 25) {
+                ed_yoff++
+                // move screen up
+                memmov(_lSCREEN, _lSCREEN + 80, 24 * 80)
+            } else {
+                // move the rest of the screen down
+                memmov(_lSCREEN + (ed_cury - ed_yoff + 1) * 80, _lSCREEN + (ed_cury - ed_yoff) * 80, (24 - ed_cury) * 80)
+            }
+
+            ed_curstr++
+            ed_cury++
+            ed_curx = 0
+
+            ed_draw_line_end(1)
+            ed_draw_linesno()
+            ed_draw_cursor()
+        } elif key == 0x800D {
+            // redraw screen
+            ed_full_draw()
+        }
     }
 }
