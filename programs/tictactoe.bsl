@@ -9,12 +9,10 @@ if (== player "O") player = "X"
 else player = "O"
 print "c'est au joueur" player
 [9]
-x = int input "x > "
-dec x
+x = - (int input "x > ") 1
 if (> x 2) then (print "X non valide") goto 9
 [1]
-y = int input "y > "
-dec y
+y = - (int input "y > ") 1
 if (> y 2) then (print "Y non valide") goto 1
 coo = + x (* y 3)
 if (!= 46 at game coo) then (print "case deja jouer") goto 9
