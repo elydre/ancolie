@@ -1,4 +1,4 @@
-#define BASILISC_VERSION "0.8"
+#define BASILISC_VERSION "0.8b"
 
 // setings
 #define BASILISC_EXIT_KEY 0x8009 // ctrl + tab
@@ -1440,6 +1440,7 @@ func execute_word([word], [return_value]) {
                     screen_x = screen_x + (10 - screen_x % 10)
                     if (screen_x > 60) {
                         putchar('\n')
+                        screen_flush()
                     }
                 }
                 printf("\n$07More information at: github.com/elydre/ancolie\n")
