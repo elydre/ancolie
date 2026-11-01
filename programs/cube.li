@@ -1,0 +1,201 @@
+#define W 80
+#define H 30
+
+#define ZOOM_X 35
+#define ZOOM_Y 18
+
+// angles
+$ angleX = 0
+$ angleY = 0
+$ angleZ = 0
+
+// signed negation (a = -a)
+#define neg(a) (~a + 1)
+
+// absolute value
+func abs(a) {
+    if (a &b 0x8000) {
+        return neg(a)
+    }
+    return a
+}
+
+// signed less than
+func slt(a, b) {
+    : sa = a &b 0x8000
+
+    if (sa != (b &b 0x8000)) {
+        return sa != 0
+    }
+
+    return a < b
+}
+
+// signed multiplication Q8
+func q8mul(a, b) {
+    : negative = ((a ^b b) &b 0x8000) != 0
+
+    : result = ((abs(a) * abs(b)) >> 8)
+
+    if (negative) {
+        return neg(result)
+    }
+
+    return result
+}
+
+
+// sinus and cosinus in Q8 format
+func sin16(a) {
+    : x = a &b 255
+    : negative = 0
+
+    if (x >= 128) {
+        x = x - 128
+        negative = 1
+    }
+
+    : y = (x * 8 * (128 - x)) / 128
+
+    if (negative) {
+        return neg(y)
+    }
+
+    return y
+}
+
+#define cos16(a) sin16(a + 64)
+
+// bresenham line algorithm
+func line(x0, y0, x1, y1, color) {
+    : dx = abs(x1 - x0)
+    : dy = abs(y1 - y0)
+
+    : sx
+    if (x0 < x1) {
+        sx = 1
+    } else {
+        sx = 0xFFFF
+    }
+
+    : sy
+    if (y0 < y1) {
+        sy = 1
+    } else {
+        sy = 0xFFFF
+    }
+
+    : err = dx - dy
+
+    while (1) {
+        if (x0 < W && y0 < H) {
+            [_lSCREEN + y0 * W + x0] = '#' |b color
+        }
+
+        if (x0 == x1 && y0 == y1) {
+            break
+        }
+
+        : e2 = err + err
+
+        if (slt(neg(dy), e2)) {
+            err = err - dy
+            x0 = x0 + sx
+        }
+
+        if (slt(e2, dx)) {
+            err = err + dx
+            y0 = y0 + sy
+        }
+    }
+}
+
+// vertices of the cube
+$ v
+v = array(
+    0xFF9C, 0xFF9C, 0xFF9C,
+    100,    0xFF9C, 0xFF9C,
+    100,    100,    0xFF9C,
+    0xFF9C, 100,    0xFF9C,
+
+    0xFF9C, 0xFF9C, 100,
+    100,    0xFF9C, 100,
+    100,    100,    100,
+    0xFF9C, 100,    100
+)
+
+// edges of the cube
+$ edges
+edges = array(
+    0, 1,
+    1, 2,
+    2, 3,
+    3, 0,
+    4, 5,
+    5, 6,
+    6, 7,
+    7, 4,
+    0, 4,
+    1, 5,
+    2, 6,
+    3, 7
+)
+
+func render() {
+    : sx = sin16(angleX)
+    : cx = cos16(angleX)
+
+    : sy = sin16(angleY)
+    : cy = cos16(angleY)
+
+    : sz = sin16(angleZ)
+    : cz = cos16(angleZ)
+
+    : px = alloca(8)
+    : py = alloca(8)
+
+    // rotation and projection of the vertices
+    : i
+    for i (0, 8) {
+
+        : x = [v + i * 3]
+        : y = [v + i * 3 + 1]
+        : z = [v + i * 3 + 2]
+
+        // rotation X
+        : y1 = (q8mul(cx, y)) - q8mul(sx, z)
+        : z1 = (q8mul(sx, y)) + q8mul(cx, z)
+
+        // rotation Y
+        : x2 = (q8mul(cy, x)) + q8mul(sy, z1)
+        : z2 = (neg(q8mul(sy, x))) + q8mul(cy, z1)
+
+        // rotation Z
+        : x3 = (q8mul(cz, x2)) - q8mul(sz, y1)
+        : y3 = (q8mul(sz, x2)) + q8mul(cz, y1)
+
+        // projection
+        [px + i] = 40 + q8mul(ZOOM_X, x3)
+        [py + i] = 13 + q8mul(ZOOM_Y, y3)
+    }
+
+    memset(_lSCREEN, ' ', 80 * 25)
+
+    for i (0, 12) {
+        : a = [edges + i * 2]
+        : b = [edges + i * 2 + 1]
+
+        line([px + a], [py + a], [px + b], [py + b], (i + 1) << 8)
+    }
+}
+
+// main loop
+while (1) {
+    render()
+    out(0x1020, 0) // refresh screen
+    // out(0x1031, 1) // sleep 1
+
+    angleX = angleX + 2
+    angleY = angleY + 3
+    angleZ = angleZ + 1
+}
