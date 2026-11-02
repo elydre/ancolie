@@ -86,8 +86,11 @@ def define(tokens_lines):
                     utl.say_error("Invalid argument in define statement", correct_syntax = "#define MACRO(arg) something(arg)")
                 if not utl.is_valid_name(e[0]):
                     utl.say_error(f"Invalid argument name in define statement: {e[0]}", correct_syntax = "#define MACRO(arg) something(arg)")
-            new_define.args = [e[0] for e in args]
-            new_define.replacement_tokens = line[closing_par + 1:]
+            new_define.args = ["+" + e[0] for e in args]
+
+            for e in line[closing_par + 1:]:
+                key = "+" + e
+                new_define.replacement_tokens.append(key if key in new_define.args else e)
 
             continue
 
