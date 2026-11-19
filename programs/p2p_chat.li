@@ -1,0 +1,262 @@
+// redstone p2p chat program
+
+#define OUT_PORT 1
+#define IN_PORT  3
+
+#define INPUT_COLOR 0x0B00
+#define INPUT_XOFFSET 2
+#define INPUT_PROMPT ": "
+#define INPUT_PROMPT_COLOR 0x0700
+
+#define SEND_COLOR 0x0B00
+#define RECV_COLOR 0x0C00
+#define END_TRANS_COLOR 0x0800
+
+#define refresh() out(0x1020, 0)
+
+$ send_line = INTMAX
+$ recv_line = INTMAX
+
+func scroll_if_needed() {
+    if (send_line < 24 || send_line == INTMAX) && (recv_line < 24 || recv_line == INTMAX) {
+        return
+    }
+
+    memmov(_lSCREEN, _lSCREEN + 80, 80 * 23)
+    memset(_lSCREEN + 80 * 23, ' ', 80)
+
+    if send_line != INTMAX {
+        send_line--
+    }
+
+    if recv_line != INTMAX {
+        recv_line--
+    }
+}
+
+func recv() {
+    $ v = 0
+    $ index = 0
+    $ old = 0
+    $ recv_row = 0
+
+    : part = in(IN_PORT)
+
+    if part == 0 {
+        old = 0
+        return
+    }
+
+    if part == old {
+        return
+    }
+
+    old = part
+
+    if part != 15 {
+        if index {
+            v = v + (part - 1) * (index * 14)
+        } else {
+            v = v + (part - 1)
+        }
+
+        index++
+        return
+    }
+
+    index = 0
+
+    if v == 0 {
+        return
+    }
+
+    if v == '\n' {
+        [_lSCREEN + 80 * recv_line + recv_row] = '$' |b END_TRANS_COLOR
+        recv_row = 0
+    } else {
+        if (recv_row == 0) {
+            recv_line++
+            if (recv_line <= send_line && send_line != INTMAX) {
+                recv_line = send_line + 1
+            }
+            scroll_if_needed()
+        }
+        [_lSCREEN + 80 * recv_line + recv_row] = v |b RECV_COLOR
+        recv_row++
+    }
+
+    refresh()
+    v = 0
+}
+
+func sleep(n) {
+    : i = 0
+    for i (0, n) {
+        recv()
+        out(0x1031, 1)
+    }
+}
+
+func send([msg]) {
+    : old_part = 0
+    : i = 0
+
+    send_line++
+    if (send_line <= recv_line && recv_line != INTMAX) {
+        send_line = recv_line + 1
+    }
+    scroll_if_needed()
+
+    while [msg + i] {
+        : v = [msg + i]
+        if (v == '\n') {
+            [_lSCREEN + 80 * send_line + i] = '$' |b END_TRANS_COLOR
+        } else {
+            [_lSCREEN + 80 * send_line + i] = v |b SEND_COLOR
+        }
+        refresh()
+
+        while v {
+            : part = v % 14 + 1
+            v = v / 14
+            if (part == old_part) {
+                out(OUT_PORT, 0)
+                sleep(2)
+            }
+            old_part = part
+            out(OUT_PORT, part)
+            sleep(2)
+        }
+
+        out(OUT_PORT, 15)
+        sleep(2)
+        out(OUT_PORT, 0)
+        i++
+    }
+}
+
+func input_flush(cursor) {
+    out(0x1021, 24 * 80 + INPUT_XOFFSET + cursor)
+    refresh()
+}
+
+func input([buffer], size) {
+    : buffer_i type cursor chr = 0
+
+    buffer_i = 0
+    cursor = 0
+
+    if (size > 80 - INPUT_XOFFSET) {
+        size = 80 - INPUT_XOFFSET
+    }
+
+    : i = 0
+    while [INPUT_PROMPT + i] {
+        [_lSCREEN + 80 * 24 + i] = [INPUT_PROMPT + i] |b INPUT_PROMPT_COLOR
+        i++
+    }
+
+    input_flush(cursor)
+
+    while 1 {
+        type = in(0x1010)
+
+        if type == 0 {
+            // nothing for now
+            sleep(1)
+            continue
+        }
+
+        if type == 2 || type == 4 {
+            // keyboard release
+            in(0x1011) // consume the keycode
+            continue
+        }
+
+        chr = in(0x1011)
+
+        if type == 1 {
+            // text key down
+            if buffer_i < size - 1 && (chr >= 32 && chr <= 126) {
+                if cursor == buffer_i {
+                    [buffer + buffer_i] = chr
+                    [_lSCREEN + 80 * 24 + INPUT_XOFFSET + buffer_i] = chr |b INPUT_COLOR
+                    buffer_i++
+                } else {
+                    // insert character in the middle of the buffer
+                    i = buffer_i
+                    while i > cursor {
+                        [buffer + i] = [buffer + i - 1]
+                        i--
+                    }
+                    [buffer + cursor] = chr
+                    buffer_i++
+                    for i (cursor, buffer_i) {
+                        [_lSCREEN + 80 * 24 + INPUT_XOFFSET + i] = [buffer + i] |b INPUT_COLOR
+                    }
+                }
+                cursor++
+                input_flush(cursor)
+            }
+            continue
+        }
+
+        if type != 3 {
+            // not a special key down
+            continue
+        }
+
+        if chr == '\b' || chr == 127 { // backspace or delete
+            if chr == '\b' && cursor > 0 {
+                for i (cursor, buffer_i) {
+                    [buffer + i - 1] = [buffer + i]
+                }
+                cursor--
+            } elif chr == 127 && cursor < buffer_i {
+                for i (cursor, buffer_i) {
+                    [buffer + i] = [buffer + i + 1]
+                }
+            } else {
+                continue
+            }
+
+            buffer_i--
+            for i (0, buffer_i) {
+                [_lSCREEN + 80 * 24 + INPUT_XOFFSET + i] = [buffer + i] |b INPUT_COLOR
+            }
+            [_lSCREEN + 80 * 24 + INPUT_XOFFSET + buffer_i] = ' ' |b INPUT_COLOR
+            input_flush(cursor)
+        }
+
+        elif chr == '\r' {
+            [buffer + buffer_i++] = '\n'
+            [buffer + buffer_i] = 0
+            memset(_lSCREEN + 80 * 24 + INPUT_XOFFSET, 0, 80 - INPUT_XOFFSET)
+            input_flush(0)
+            return buffer_i
+        }
+
+        elif chr == 'P' { // left arrow
+            if cursor > 0 {
+                cursor--
+                input_flush(cursor)
+            }
+        }
+
+        elif chr == 'O' { // right arrow
+            if cursor < buffer_i {
+                cursor++
+                input_flush(cursor)
+            }
+        }
+    }
+
+    return INTMAX
+}
+
+: buffer = alloca(81)
+
+while 1 {
+    input(buffer, 80)
+    send(buffer)
+}
