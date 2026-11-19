@@ -1,4 +1,4 @@
-#define BASILISC_VERSION "0.8b"
+#define BASILISC_VERSION "0.8c"
 
 // setings
 #define BASILISC_EXIT_KEY 0x8009 // ctrl + tab
@@ -1357,14 +1357,16 @@ func execute_word([word], [return_value]) {
             printn(word_s[args].value + 1, [word_s[args].value])
             screen_flush()
 
-            : [input_str] = malloc(64)
+            : [input_str] = malloc(65)
             if (!input_str) {
                 say_error("out of memory\n")
                 retcode = EXEC_ERROR
                 break
             }
 
-            if (input(input_str, 64) == INTMAX) {
+            [input_str] = input(input_str + 1, 64)
+
+            if ([input_str] == INTMAX) {
                 printf("\n$07execution interrupted by user\n")
                 free(input_str)
                 retcode = EXEC_END

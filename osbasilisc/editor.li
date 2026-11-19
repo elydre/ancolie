@@ -164,6 +164,8 @@ func ed_delete_char(from) {
 func ed_full_draw() {
     screen_clear()
 
+    ed_draw_cursor()
+
     : i = 0
     : y
 
@@ -177,11 +179,11 @@ func ed_full_draw() {
             break
         }
         ed_draw_line(y, i)
+        out(0x1020, 0)
         i = ed_line_end(i) + 1
     }
 
     ed_draw_linesno()
-    ed_draw_cursor()
 }
 
 func program_edit() {
