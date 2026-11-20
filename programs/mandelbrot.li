@@ -1,0 +1,64 @@
+#define MAX_ITER 100
+#define S 32 // scale factor
+
+#define WIDTH 80
+#define HEIGHT 25
+
+#define XMIN 0
+#define XMAX 100
+
+#define YMIN 22
+#define YMAX 120
+
+func mandelbrot(cx, cy) {
+    : zr = 2 * S
+    : zi = 2 * S
+    : n = 0
+
+    while n < MAX_ITER {
+        : left = zr * zr + zi * zi + 4 * S * S
+        : right = 4 * S * (zr + zi)
+        if left > right {
+            break
+        }
+
+        : pos_R = (zr * zr) / S + 4 * zi + cx
+        : neg_R = (zi * zi) / S + 4 * zr
+        
+        : pos_I = (2 * zr * zi) / S + 8 * S + cy
+        : neg_I = 4 * zr + 4 * zi
+
+        if pos_R < neg_R || pos_I < neg_I {
+            break
+        }
+
+        zr = pos_R - neg_R
+        zi = pos_I - neg_I
+        n++
+    }
+
+    return n
+}
+
+
+: j i
+for j (0, HEIGHT) {
+    : cy = YMIN + j * (YMAX - YMIN) / (HEIGHT - 1)
+    : line = ""
+    for i (0, WIDTH) {
+        : cx = XMIN + i * (XMAX - XMIN) / (WIDTH - 1)
+        : iter = mandelbrot(cx, cy)
+
+        if iter == MAX_ITER {
+            [_lSCREEN + i + j * WIDTH] = 0xFF00
+        } else {
+            [_lSCREEN + i + j * WIDTH] = ((iter % 15) << 12) |b 0xF20
+        }
+    }
+    out(0x1020, 0) // refresh
+}
+
+
+while (1) {
+    out(0x1031, 10) // sleep
+}
