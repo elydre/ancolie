@@ -184,6 +184,7 @@ func ed_full_draw() {
     }
 
     ed_draw_linesno()
+    ed_draw_cursor()
 }
 
 func program_edit() {
@@ -258,11 +259,11 @@ func program_edit() {
             }
             line_start = ed_line_start(ed_curstr)
             newline_end = line_start - 1
-            
+
             column = ed_curstr - line_start
 
             newline_start = ed_line_start(newline_end)
-            
+
             if newline_start + column > newline_end {
                 ed_curstr = newline_end
                 ed_curx = newline_end - newline_start
