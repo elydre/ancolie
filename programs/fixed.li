@@ -1,0 +1,631 @@
+#include "osbasilisc/klib/screen.li"
+
+struct fixed {
+    : high
+    : low
+    : frac
+}
+
+// ***************************************************** //
+// **                                                 ** //
+// **  NEG : r = -a                                   ** //
+// **                                                 ** //
+// ***************************************************** //
+
+func fixed_neg([r], [a]) {
+    fixed[r].frac = ~fixed[a].frac + 1
+
+    if (fixed[a].frac) {
+        fixed[r].low = ~fixed[a].low
+        fixed[r].high = ~fixed[a].high
+        return
+    }
+
+    fixed[r].low = ~fixed[a].low + 1
+
+    if (fixed[r].low) {
+        fixed[r].high = ~fixed[a].high
+        return
+    }
+
+    fixed[r].high = ~fixed[a].high + 1
+}
+
+// ***************************************************** //
+// **                                                 ** //
+// **  PRINT                                          ** //
+// **                                                 ** //
+// ***************************************************** //
+
+func putfixed_decimal(frac) {
+    : i
+
+    for i (0, 6) {
+        : low
+        : high
+
+        // Multiplication 32 bits par 10
+        low = frac << 3
+        high = frac >> 13
+
+        : t = frac << 1
+        : h = frac >> 15
+
+        low = low + t
+
+        if (low < t) {
+            h++
+        }
+
+        high = high + h
+
+        // Les 16 bits hauts correspondent
+        // au prochain chiffre décimal.
+        putchar('0' + high)
+
+        if (low == 0) {
+            return
+        }
+
+        // Les 16 bits bas deviennent
+        // la nouvelle fraction.
+        frac = low
+    }
+}
+
+
+func div32_10([high], [low]) {
+    : qhigh = 0
+    : qlow = 0
+    : rem = 0
+    : i = 31
+    : bit
+
+    while i != INTMAX {
+        if i >= 16 {
+            bit = ([high] >> (i - 16)) &b 1
+        } else {
+            bit = ([low] >> i) &b 1
+        }
+
+        rem = rem * 2 + bit
+
+        if rem >= 10 {
+            rem = rem - 10
+
+            if i >= 16 {
+                qhigh = qhigh |b (1 << (i - 16))
+            } else {
+                qlow = qlow |b (1 << i)
+            }
+        }
+
+        i--
+    }
+
+    [high] = qhigh
+    [low] = qlow
+
+    return rem
+}
+
+func putuint32(high, low) {
+    : digits = alloca(10)
+    : count = 0
+
+    if high == 0 && low == 0 {
+        putchar('0')
+        return
+    }
+
+    while high || low {
+        [digits + count++] = div32_10(&high, &low)
+    }
+
+    while count-- {
+        putchar([digits + count] + '0')
+    }
+}
+
+func fixed_print([a]) {
+    : r
+
+    if (fixed[a].high &b 0x8000) {
+        putchar('-')
+        r = alloca(sizeof(fixed))
+        fixed_neg(r, a)
+    } else {
+        r = a
+    }
+
+    putuint32(fixed[r].high, fixed[r].low)
+    putchar('.')
+
+    putfixed_decimal(fixed[r].frac)
+}
+
+// ***************************************************** //
+// **                                                 ** //
+// **  ADD : r = a + b                                ** //
+// **                                                 ** //
+// ***************************************************** //
+
+func fixed_add([r], [a], [b]) {
+    : carry = 0
+    : c
+    : t
+
+    // frac
+    t = fixed[a].frac + fixed[b].frac
+    carry = (t < fixed[a].frac)
+    fixed[r].frac = t
+
+    // low
+    t = fixed[a].low + fixed[b].low
+    c = (t < fixed[a].low)
+
+    fixed[r].low = t + carry
+
+    if fixed[r].low < t {
+        c = 1
+    }
+
+    // high
+    fixed[r].high = fixed[a].high + fixed[b].high + c
+}
+
+// ***************************************************** //
+// **                                                 ** //
+// **  SUB : r = a - b                                ** //
+// **                                                 ** //
+// ***************************************************** //
+
+func fixed_sub([r], [a], [b]) {
+    : borrow = 0
+    : c
+    : t
+
+    // frac
+    t = fixed[a].frac - fixed[b].frac
+    borrow = (fixed[a].frac < fixed[b].frac)
+    fixed[r].frac = t
+
+    // low
+    t = fixed[a].low - fixed[b].low
+    c = (fixed[a].low < fixed[b].low)
+
+    fixed[r].low = t - borrow
+
+    if t < borrow {
+        c = 1
+    }
+
+    // high
+    fixed[r].high = fixed[a].high - fixed[b].high - c
+}
+
+// ***************************************************** //
+// **                                                 ** //
+// **  MUL : r = a * b                                ** //
+// **                                                 ** //
+// ***************************************************** //
+
+func mul16([hi], [lo], a, b) {
+    : a0 = a &b 0xFF
+    : a1 = a >> 8
+    : b0 = b &b 0xFF
+    : b1 = b >> 8
+
+    // : p0 = a0 * b0
+    : p1 = a0 * b1
+    : p2 = a1 * b0
+    // : p3 = a1 * b1
+
+    : carry old
+
+    // [lo] = p0
+    // [hi] = p3
+
+    [lo] = a0 * b0
+    [hi] = a1 * b1
+
+    // Ajouter p1 << 8
+    old = [lo]
+    [lo] = [lo] + (p1 << 8)
+    carry = ([lo] < old)
+
+    [hi] = [hi] + (p1 >> 8)
+    [hi] = [hi] + carry
+
+    // Ajouter p2 << 8
+    old = [lo]
+    [lo] = [lo] + (p2 << 8)
+    carry = ([lo] < old)
+
+    [hi] = [hi] + (p2 >> 8)
+    [hi] = [hi] + carry
+}
+
+
+func add_product([p], index, a, b) {
+    : hi lo
+    : t
+    : carry
+    : i
+
+    mul16(&hi, &lo, a, b)
+
+    // Ajouter le mot faible
+    t = [p + index] + lo
+    carry = (t < [p + index])
+    [p + index] = t
+
+    // Ajouter le mot fort et la retenue
+    t = [p + index + 1] + hi
+
+    : c = (t < [p + index + 1])
+    : u = t + carry
+
+    if (u < t) {
+        c = 1
+    }
+
+    [p + index + 1] = u
+    carry = c
+
+    // Propager la retenue
+    i = index + 2
+
+    while (carry && i < 6) {
+        [p + i] = [p + i] + 1
+        carry = ([p + i++] == 0)
+    }
+}
+
+func negate48([x]) {
+    : carry
+
+    [x] = ~[x] + 1
+    carry = ([x] == 0)
+
+    [x + 1] = ~[x + 1] + carry
+    carry = carry && ([x + 1] == 0)
+
+    [x + 2] = ~[x + 2] + carry
+}
+
+func fixed_mul([r], [a], [b]) {
+    : A = alloca(3)
+    : B = alloca(3)
+    : P = array(0, 0, 0, 0, 0, 0)
+
+    : negative
+    : i j
+
+    // Déterminer le signe
+    negative = (fixed[a].high ^b fixed[b].high) &b 0x8000
+
+    // Décomposer les opérandes
+    [A]     = fixed[a].frac
+    [A + 1] = fixed[a].low
+    [A + 2] = fixed[a].high
+
+    [B]     = fixed[b].frac
+    [B + 1] = fixed[b].low
+    [B + 2] = fixed[b].high
+
+    // Convertir en valeurs absolues
+    if (fixed[a].high &b 0x8000) {
+        negate48(A)
+    }
+
+    if (fixed[b].high &b 0x8000) {
+        negate48(B)
+    }
+
+    // Multiplication scolaire
+    for i (0, 3) {
+        for j (0, 3) {
+            if (i + j <= 3) {
+                add_product(
+                    P,
+                    i + j,
+                    [A + i],
+                    [B + j]
+                )
+            }
+        }
+    }
+
+    // Décalage logique de 16 bits
+    fixed[r].frac = [P + 1]
+    fixed[r].low  = [P + 2]
+    fixed[r].high = [P + 3]
+
+    // Appliquer le signe
+    if (negative) {
+        fixed_neg(r, r)
+    }
+}
+
+// ***************************************************** //
+// **                                                 ** //
+// **  DIV : r = a / b                                ** //
+// **                                                 ** //
+// ***************************************************** //
+
+func shift_left_49([x]) {
+    : c0 = [x] >> 15
+    : c1 = [x + 1] >> 15
+    : c2 = [x + 2] >> 15
+
+    [x]     = [x] << 1
+    [x + 1] = ([x + 1] << 1) |b c0
+    [x + 2] = ([x + 2] << 1) |b c1
+    [x + 3] = ([x + 3] << 1) |b c2
+}
+
+func try_sub48([rem], [B]) {
+    : TEMP = alloca(3)
+    : borrow
+    : t
+    : c
+
+    // Mot 0
+    t = [rem] - [B]
+    borrow = ([rem] < [B])
+    [TEMP] = t
+
+    // Mot 1
+    t = [rem + 1] - [B + 1]
+    c = ([rem + 1] < [B + 1])
+
+    [TEMP + 1] = t - borrow
+
+    if (borrow && t == 0) {
+        c = 1
+    }
+
+    borrow = c
+
+    // Mot 2
+    t = [rem + 2] - [B + 2]
+    c = ([rem + 2] < [B + 2])
+
+    [TEMP + 2] = t - borrow
+
+    if (borrow && t == 0) {
+        c = 1
+    }
+
+    borrow = c
+
+    if ([rem + 3] < borrow) {
+        return 0
+    }
+
+    [rem] = [TEMP]
+    [rem + 1] = [TEMP + 1]
+    [rem + 2] = [TEMP + 2]
+    [rem + 3] = [rem + 3] - borrow
+
+    return 1
+}
+
+func highest_bit48([x]) {
+    : value
+    : i = 2
+
+    while i != INTMAX {
+        value = [x + i]
+
+        if (value) {
+            : j = 15
+            while j != INTMAX {
+                if (value &b (1 << j)) {
+                    return i * 16 + j
+                }
+                j--
+            }
+        }
+        i--
+    }
+
+    return INTMAX
+}
+
+func fixed_div([r], [a], [b]) {
+    : A = alloca(3)
+    : B = alloca(3)
+    : N = alloca(4)
+    : Q = array(0, 0, 0)
+    : rem = array(0, 0, 0, 0)
+
+    : negative
+    : i
+    : j
+    : bit
+    : mask
+
+    // Division par zéro
+    if (fixed[b].frac == 0 && fixed[b].low == 0 && fixed[b].high == 0) {
+        return 1
+    }
+
+    // Signe du résultat
+    negative = (fixed[a].high ^b fixed[b].high) &b 0x8000
+
+    // Copie des opérandes
+    [A]     = fixed[a].frac
+    [A + 1] = fixed[a].low
+    [A + 2] = fixed[a].high
+
+    [B]     = fixed[b].frac
+    [B + 1] = fixed[b].low
+    [B + 2] = fixed[b].high
+
+    // Valeurs absolues
+    if (fixed[a].high &b 0x8000) {
+        negate48(A)
+    }
+
+    if (fixed[b].high &b 0x8000) {
+        negate48(B)
+    }
+
+    // Numérateur = A << 16
+    [N]     = 0
+    [N + 1] = [A]
+    [N + 2] = [A + 1]
+    [N + 3] = [A + 2]
+
+    // Trouver le premier bit utile
+    i = highest_bit48(A) + 16
+
+    // Division
+    while i != INTMAX {
+        j = i
+
+        bit = ([N + j / 16] >> (j % 16)) &b 1
+
+        shift_left_49(rem)
+        [rem] = [rem] |b bit
+
+        if (try_sub48(rem, B)) {
+            [Q + i / 16] = [Q + i / 16] |b (1 << (i % 16))
+        }
+
+        i--
+    }
+
+    if (negative) {
+        negate48(Q)
+    }
+
+    // Résultat
+    fixed[r].frac = [Q]
+    fixed[r].low  = [Q + 1]
+    fixed[r].high = [Q + 2]
+}
+
+// ***************************************************** //
+// **                                                 ** //
+// **  EQ & NEQ                                       ** //
+// **                                                 ** //
+// ***************************************************** //
+
+func fixed_eq([a], [b]) {
+    if fixed[a].low != fixed[b].low {
+        return 0
+    }
+    if fixed[a].high != fixed[b].high {
+        return 0
+    }
+    return fixed[a].frac == fixed[b].frac
+}
+
+func fixed_neq([a], [b]) {
+    if fixed[a].low == fixed[b].low {
+        return 0
+    }
+    if fixed[a].high == fixed[b].high {
+        return 0
+    }
+    return fixed[a].frac != fixed[b].frac
+}
+
+// ***************************************************** //
+// **                                                 ** //
+// **  LT & GT & LTE & GTE                            ** //
+// **                                                 ** //
+// ***************************************************** //
+
+func fixed_compare([A], [B]) {
+    : signA = fixed[A].high >> 15
+    : signB = fixed[B].high >> 15
+
+    // Les signes sont différents
+    if (signA != signB) {
+        if (signA == 1) {
+            return INTMAX
+        }
+        return 1
+    }
+
+    // Comparaison du mot high
+    if (fixed[A].high > fixed[B].high) {
+        return 1
+    }
+    if (fixed[A].high < fixed[B].high) {
+        return INTMAX
+    }
+
+    // Comparaison du mot low
+    if (fixed[A].low > fixed[B].low) {
+        return 1
+    }
+    if (fixed[A].low < fixed[B].low) {
+        return INTMAX
+    }
+
+    // Comparaison du mot frac
+    if (fixed[A].frac > fixed[B].frac) {
+        return 1
+    }
+    if (fixed[A].frac < fixed[B].frac) {
+        return INTMAX
+    }
+
+    return 0
+}
+
+func fixed_lt([A], [B]) {
+    return fixed_compare([A], [B]) == INTMAX
+}
+
+func fixed_gt([A], [B]) {
+    return fixed_compare([A], [B]) == 1
+}
+
+func fixed_lte([A], [B]) {
+    return fixed_compare([A], [B]) != 1
+}
+
+func fixed_gte([A], [B]) {
+    return fixed_compare([A], [B]) != INTMAX
+}
+
+: a = array(0, 20, 0)
+: b = array(0, 1, 0x8000)
+: r = alloca(sizeof(fixed))
+
+// fixed_neg(r, n) // r = -n
+//
+// fixed_print(n) // n = 1.5
+// putchar('\n')
+// fixed_print(r) // r = -n = -1.5
+// putchar('\n')
+//
+// fixed_add(r2, n, n)
+// fixed_print(r2) // r2 = n + n = 1.5 + 1.5 = 3.0
+// putchar('\n')
+//
+// fixed_add(r2, r, n)
+// fixed_print(r2) // r2 = r + n = -n + n = -1.5 + 1.5 = 0.0
+// putchar('\n')
+//
+// : a = array(0x12, 0xd687, 0) // 1234567
+//
+//
+// fixed_add(r2, a, n) // r2 = a + 1.5
+// fixed_print(r2)
+// putchar('\n')
+
+fixed_div(r, a, b)
+fixed_print(r)
+
+screen_flush()
+
+while (1) {
+    out(0x1031, 1)
+}
