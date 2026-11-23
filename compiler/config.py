@@ -1,6 +1,6 @@
 import compiler.defs as defs
 
-LLC_VERSION = "1.3b"
+LLC_VERSION = "1.3c"
 
 MAGIC_NUMBER = 0xF057
 ARCH_VERSION = 0x0120

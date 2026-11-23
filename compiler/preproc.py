@@ -124,9 +124,11 @@ def define(tokens_lines):
                 replacement_tokens = e.replacement_tokens.copy()
 
                 for j in range(len(e.args)):
-                    for k in range(len(replacement_tokens)):
+                    k = 0
+                    while k < len(replacement_tokens):
                         if replacement_tokens[k] == e.args[j]:
                             replacement_tokens[k:k + 1] = args[j]
+                        k = k + 1
 
                 line[i:closing_par + 1] = replacement_tokens
                 i -= len(replacement_tokens)
