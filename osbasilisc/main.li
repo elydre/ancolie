@@ -1,4 +1,4 @@
-#define BASILISC_VERSION "0.9b"
+#define BASILISC_VERSION "0.9c"
 
 // setings
 #define BASILISC_EXIT_KEY 0x8009 // ctrl + tab
@@ -1640,6 +1640,7 @@ func program_run() {
         inst = parse_str(program, end, NULL, 1)
 
         if (inst == NULL) {
+            printf("$09on %S\n", program, end)
             return 1
         }
 
@@ -1649,6 +1650,9 @@ func program_run() {
         }
 
         if (check_types(inst) == EXEC_ERROR) {
+            printf("$09on ")
+            print_word(0x0900, inst)
+            print("\n")
             return 1
         }
 
