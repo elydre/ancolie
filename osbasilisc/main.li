@@ -1,4 +1,4 @@
-#define BASILISC_VERSION "0.9"
+#define BASILISC_VERSION "0.9b"
 
 // setings
 #define BASILISC_EXIT_KEY 0x8009 // ctrl + tab
@@ -293,7 +293,13 @@ func line_end([str]) {
 
     $ last_line_count = 0
 
-    g_lineno = g_lineno + last_line_count + 1
+    if g_lineno {
+        g_lineno = g_lineno + last_line_count + 1
+    } else {
+        // we forget the last read count if it's a new program
+        g_lineno++
+    }
+
     last_line_count = 0
 
     while ([str + i]) {
@@ -302,14 +308,20 @@ func line_end([str]) {
                 in_string = !in_string
             }
             case '(' {
-                if !in_string {
-                    open_parens++
+                if in_string {
+                    break
                 }
+                open_parens++
             }
             case ')' {
-                if !in_string {
-                    open_parens--
+                if in_string {
+                    break
                 }
+                if open_parens == 0 {
+                    say_error("unexpected closing parentheses")
+                    return INTMAX
+                }
+                open_parens--
             }
             case '\n' {
                 if open_parens == 0 {
@@ -324,6 +336,7 @@ func line_end([str]) {
 
     if open_parens {
         say_error("unclosed parentheses")
+        return INTMAX
     }
 
     return i
